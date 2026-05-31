@@ -41,6 +41,7 @@ let get_sos binary =
   if is_elf path then
     let output = System.call Ldd path in
     let shared_libs = List.filter_map parse_true_so_line output in
-    let to_embed = List.filter should_embed shared_libs in
+    (* let to_embed = List.filter should_embed shared_libs in *)
+    let to_embed = shared_libs in
     List.map snd to_embed
   else []
