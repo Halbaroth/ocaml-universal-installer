@@ -1,5 +1,6 @@
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <wchar.h>
 
 #include <caml/mlvalues.h>
@@ -48,13 +49,16 @@ CAMLprim value ml_resolve_dll(value mlDllName)
   CAMLparam1(mlDllName);
   CAMLlocal2(mlResult, mlTmp);
   WCHAR *dllname = ml_value_to_wchar(mlDllName, CP_ACP);
+  printf("SEARCHING %s\n", dllname);
   WCHAR filename[MAX_PATH];
   DWORD len = SearchPathW(NULL, dllname, NULL, MAX_PATH, filename, NULL);
   if (len > 0 && len < MAX_PATH) {
     mlTmp = ml_wchar_to_value(filename, CP_UTF8);
+    printf("FOUND %s\n", filename);
     mlResult = caml_alloc_some(mlTmp);
   } else {
     mlResult = Val_none;
+    printf("NOT FOUND\n");
   }
   free(dllname);
   CAMLreturn(mlResult);

@@ -225,5 +225,6 @@ let get_dlls binary =
   in
   let dlls = aux StrSet.empty (OpamFilename.to_string binary) in
   StrSet.fold (fun dll dlls ->
+    Format.eprintf "FFOUND %s@." dll;
       OpamFilename.of_string (System.normalize_path dll) :: dlls
     ) dlls [] |> List.rev
