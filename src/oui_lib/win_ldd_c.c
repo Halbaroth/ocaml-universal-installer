@@ -11,6 +11,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <psapi.h>
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
@@ -43,21 +44,123 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
   CAMLreturnT(WCHAR *, result);
 }
 
-CAMLprim value ml_resolve_dll(value mlDllName)
-{
-  CAMLparam1(mlDllName);
-  CAMLlocal2(mlResult, mlTmp);
-  WCHAR *dllname = ml_value_to_wchar(mlDllName, CP_ACP);
-  WCHAR filename[MAX_PATH];
-  DWORD len = SearchPathW(NULL, dllname, NULL, MAX_PATH, filename, NULL);
-  if (len > 0 && len < MAX_PATH) {
-    mlTmp = ml_wchar_to_value(filename, CP_UTF8);
-    mlResult = caml_alloc_some(mlTmp);
-  } else {
-    mlResult = Val_none;
-  }
-  free(dllname);
+static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
+  CAMLparam0();
+  CAMLlocal1(mlResult);
+
+  size_t len = 0;
+  DWORD res;
+  WCHAR* buf = NULL;
+
+  do {
+    len += 1024;
+    WCHAR* new_buf = realloc(buf, len * sizeof(*new_buf));
+    if (!new_buf) {
+      free(buf);
+      caml_failwith("cannot allocate memory for module filename");
+    }
+
+    buf = new_buf;
+    res = GetModuleFileNameExW(hp, hm, buf, len);
+    if (res == 0) {
+      free(buf);
+      caml_failwith("cannot execute GetModuleFileNameExW");
+    }
+  } while (res == len);
+
+  mlResult = ml_wchar_to_value(buf, CP_UTF8);
+  free(buf);
   CAMLreturn(mlResult);
+}
+
+static value ml_get_module_filenames(HANDLE hp, value mlList) {
+  CAMLparam1(mlList);
+  CAMLlocal2(mlCurr, mlCell);
+  mlCurr = Val_emptylist;
+
+  while(!Is_long(mlList)) {
+    HMODULE hm = (HMODULE)Long_val(Field(mlList, 0));
+    mlCell= caml_alloc(2, 0);
+    Field(mlCell, 0) = ml_get_module_filename(hp, hm);
+    Field(mlCell, 1) = mlCurr;
+    mlCurr = mlCell;
+    mlList = Field(mlList, 1);
+  }
+
+  CAMLreturn(mlCurr);
+}
+
+static const size_t DOS_HEADER_SIZE = 4096;
+
+static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
+  PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
+  ReadProcessMemory(hProcess, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
+  PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
+  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint; 
+}
+
+static const unsigned char int3 = 0xcc; 
+
+static HANDLE ml_start_process(value mlPath) {
+  CAMLparam1(mlPath);
+  STARTUPINFOW si;
+  PROCESS_INFORMATION pi;
+  
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8); 
+  if(!CreateProcessW(NULL, path, NULL, NULL, FALSE, 
+      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
+    caml_failwith("cannot start the process in debugging mode");
+
+  CAMLreturnT(HANDLE, pi.hProcess);
+}
+
+CAMLprim value ml_report_dlls(value mlPath) {
+  CAMLparam1(mlPath);
+  CAMLlocal3(mlCurr, mlCell, mlResult);
+  HANDLE hProcess = ml_start_process(mlPath);
+  DEBUG_EVENT ev;
+  mlCurr = Val_emptylist; 
+
+  while (1) {
+    if (!WaitForDebugEvent(&ev, INFINITE))
+      caml_failwith("cannot wait for debug event");
+
+    switch (ev.dwDebugEventCode) {
+      case CREATE_PROCESS_DEBUG_EVENT:
+        PVOID entry_point = 
+          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
+        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+        break;
+
+      case LOAD_DLL_DEBUG_EVENT:
+        HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
+        mlCell = caml_alloc(2, 0);
+        Field(mlCell, 0) = Val_long(hm);
+        Field(mlCell, 1) = mlCurr;
+        mlCurr = mlCell;
+        break;
+
+      case EXCEPTION_DEBUG_EVENT:
+        switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
+          case STATUS_BREAKPOINT:
+            mlResult = ml_get_module_filenames(hProcess, mlCurr);
+            TerminateProcess(hProcess, 0);
+            CAMLreturn(mlResult);
+        }
+        break;
+
+      case EXIT_PROCESS_DEBUG_EVENT:
+        caml_failwith("process ended before reaching the breakpoint");
+    } 
+
+    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+  }    
+
+  caml_failwith("leaved the main looping without reaching the breakpoint");
 }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
@@ -79,10 +182,10 @@ CAMLprim value ml_get_windows_directory(value mlUnit)
 
 #else
 
-CAMLprim value ml_resolve_dll(value mlDllName)
+CAMLprim value ml_report_dlls(value mlPath)
 {
-  CAMLparam1(mlDllName);
-  CAMLreturn(Val_none);
+  CAMLparam1(mlPath);
+  CAMLreturn(Val_emptylist);
 }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
