@@ -24,21 +24,21 @@ let check_wix_installed () =
     raise @@ System.System_error
       (Format.sprintf "Wix binaries couldn't be found.")
 
-let add_dlls_to_bundle ~bundle_dir (binary : Installer_config.exec_file) =
+let add_dlls_to_bundle ~bundle_dir (binary : Installer_config.exec_file) acc =
   let binary = System.maybe_exe ~dir:bundle_dir ~path:binary.path in
   let dlls = Win_ldd.get_dlls (bundle_dir // binary) in
   match dlls with
-  | [] -> ()
+  | [] -> acc
   | _ ->
       OpamConsole.formatted_msg "Getting dlls for %s:\n%s" binary
         (OpamStd.Format.itemize OpamFilename.to_string dlls);
-      let bin_dir = OpamFilename.Op.(bundle_dir / "bin") in
-      OpamFilename.mkdir bin_dir;
-      List.iter (fun dll -> OpamFilename.copy_in dll bin_dir) dlls
+      List.rev_append dlls acc
 
-let add_dlls_to_bundle ~bundle_dir (binary : Installer_config.exec_file) =
+let add_dlls_to_bundle ~bundle_dir (binary : Installer_config.exec_file) acc =
   if binary.deps then
-    add_dlls_to_bundle ~bundle_dir binary
+    add_dlls_to_bundle ~bundle_dir binary acc
+  else
+    acc
 
 let data_file ~tmp_dir ~default:(name, content) data_path =
   match data_path with
@@ -52,9 +52,13 @@ let create_installer ?(keep_wxs=false) ~tmp_dir
     ~(installer_config : Installer_config.internal) ~bundle_dir installer =
   check_wix_installed ();
   OpamConsole.header_msg "Preparing MSI installer using WiX";
-  List.iter (fun binary ->
-      add_dlls_to_bundle ~bundle_dir binary
-    ) installer_config.exec_files;
+  let dlls =
+    List.fold_left (fun acc binary -> add_dlls_to_bundle ~bundle_dir binary acc)
+    [] installer_config.exec_files
+  in
+  let bin_dir = OpamFilename.Op.(bundle_dir / "bin") in
+  OpamFilename.mkdir bin_dir;
+  List.iter (fun dll -> OpamFilename.copy_in dll bin_dir) dlls;
   (* TODO: for now we consider this is an installer plugin
      if the configuration contains at least one plugin... *)
   let plugin_for =
