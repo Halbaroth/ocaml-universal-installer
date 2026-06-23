@@ -13,7 +13,8 @@
 #include <windows.h>
 #include <psapi.h>
 
-#define DEBUG(fmt, ...) fprintf(stderr, fmt "\r\n", __VA_ARGS__)
+#define DEBUG(fmt, ...) fprintf(stderr, fmt "\r\n", ##__VA_ARGS__)
+
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
