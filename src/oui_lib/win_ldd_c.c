@@ -159,7 +159,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
             DEBUG("EXCEPTION_ACCESS_VIOLATION");
             break;
 
-          case EXCEPTION_DATATYPE_MISALIGNEMENT:
+          case EXCEPTION_DATATYPE_MISALIGNMENT:
             DEBUG("EXCEPTION_DATATYPE_MISALIGNEMENT");
             break;
 
