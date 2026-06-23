@@ -124,7 +124,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
   HANDLE hProcess = ml_start_process(mlPath);
   DEBUG_EVENT ev;
   mlCurr = Val_emptylist;
-  value mlResult = Val_emptylist;
+  mlResult = Val_emptylist;
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
