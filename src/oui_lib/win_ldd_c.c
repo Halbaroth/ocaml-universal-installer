@@ -155,13 +155,41 @@ CAMLprim value ml_report_dlls(value mlPath) {
             DEBUG("DLL NOT FOUND");
             break;
 
+          case EXCEPTION_ACCESS_VIOLATION:
+            DEBUG("EXCEPTION_ACCESS_VIOLATION");
+            break;
+
+          case EXCEPTION_DATATYPE_MISALIGNEMENT:
+            DEBUG("EXCEPTION_DATATYPE_MISALIGNEMENT");
+            break;
+
+          case EXCEPTION_SINGLE_STEP:
+            DEBUG("EXCEPTION_SINGLE_STEP");
+            break;
+
+          case DBG_CONTROL_C:
+            DEBUG("DBG_CONTROL_C");
+            break;
+
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             DEBUG("get all the dlls");
             TerminateProcess(hProcess, 0);
             DEBUG("terminate the process");
             break;
+
+          default:
+            DEBUG("UNKNOWN");
+            break;
         }
+        break;
+
+      case RIP_EVENT:
+      case UNLOAD_DLL_DEBUG_EVENT:
+      case OUTPUT_DEBUG_STRING_EVENT:
+      case EXIT_THREAD_DEBUG_EVENT:
+      case CREATE_THREAD_DEBUG_EVENT:
+        DEBUG("OTHER");
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
