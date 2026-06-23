@@ -124,6 +124,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
   HANDLE hProcess = ml_start_process(mlPath);
   DEBUG_EVENT ev;
   mlCurr = Val_emptylist;
+  value mlResult = Val_emptylist;
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
@@ -149,15 +150,14 @@ CAMLprim value ml_report_dlls(value mlPath) {
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             TerminateProcess(hProcess, 0);
-            ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-            WaitForSingleObject(hProcess, INFINITE);
-            CloseHandle(hProcess);
-            CAMLreturn(mlResult);
+            break;
         }
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
-        caml_failwith("process ended before reaching the breakpoint");
+        WaitForSingleObject(hProcess, INFINITE);
+        CloseHandle(hProcess);
+        CAMLreturn(mlResult);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
