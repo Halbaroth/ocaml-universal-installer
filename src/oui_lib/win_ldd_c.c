@@ -149,7 +149,6 @@ CAMLprim value ml_report_dlls(value mlPath) {
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             TerminateProcess(hProcess, 0);
-            WaitForSingleObject(hProcess, INFINITE);
             CloseHandle(hProcess);
             CAMLreturn(mlResult);
         }
