@@ -185,11 +185,19 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case RIP_EVENT:
+        DEBUG("OTHER 1");
+        break;
       case UNLOAD_DLL_DEBUG_EVENT:
+        DEBUG("OTHER 2");
+        break;
       case OUTPUT_DEBUG_STRING_EVENT:
+        DEBUG("OTHER 3");
+        break;
       case EXIT_THREAD_DEBUG_EVENT:
+        DEBUG("OTHER 4");
+        break;
       case CREATE_THREAD_DEBUG_EVENT:
-        DEBUG("OTHER");
+        DEBUG("OTHER 5");
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
