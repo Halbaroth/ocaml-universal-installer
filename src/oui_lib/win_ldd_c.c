@@ -151,6 +151,10 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
       case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
+          case STATUS_DLL_NOT_FOUND:
+            DEBUG("DLL NOT FOUND");
+            break;
+
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             DEBUG("get all the dlls");
