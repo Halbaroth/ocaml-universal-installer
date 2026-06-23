@@ -96,22 +96,22 @@ static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
   PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
   ReadProcessMemory(hProcess, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
   PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
-  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint; 
+  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
 }
 
-static const unsigned char int3 = 0xcc; 
+static const unsigned char int3 = 0xcc;
 
 static HANDLE ml_start_process(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
   PROCESS_INFORMATION pi;
-  
+
   ZeroMemory(&si, sizeof(si));
   si.cb = sizeof(si);
   ZeroMemory(&pi, sizeof(pi));
 
-  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8); 
-  if(!CreateProcessW(NULL, path, NULL, NULL, FALSE, 
+  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
+  if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
     caml_failwith("cannot start the process in debugging mode");
 
@@ -123,7 +123,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
   CAMLlocal3(mlCurr, mlCell, mlResult);
   HANDLE hProcess = ml_start_process(mlPath);
   DEBUG_EVENT ev;
-  mlCurr = Val_emptylist; 
+  mlCurr = Val_emptylist;
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
@@ -131,7 +131,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
-        PVOID entry_point = 
+        PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
         WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         break;
@@ -148,17 +148,19 @@ CAMLprim value ml_report_dlls(value mlPath) {
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
-            TerminateProcess(hProcess, 0);
+            BOOL res = TerminateProcess(hProcess, 0);
+            if (res == 0)
+              caml_failwith("cannot stop the process");
             CAMLreturn(mlResult);
         }
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
         caml_failwith("process ended before reaching the breakpoint");
-    } 
+    }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-  }    
+  }
 
   caml_failwith("leaved the main looping without reaching the breakpoint");
 }
