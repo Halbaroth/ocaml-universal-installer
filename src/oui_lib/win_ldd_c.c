@@ -13,6 +13,8 @@
 #include <windows.h>
 #include <psapi.h>
 
+#define DEBUG(fmt, ...) fprintf(stderr, fmt "\r\n", __VA_ARGS__)
+
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
   CAMLparam0();
@@ -127,6 +129,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
   mlResult = Val_emptylist;
 
   while (1) {
+    DEBUG("wait for the next event");
     if (!WaitForDebugEvent(&ev, INFINITE))
       caml_failwith("cannot wait for debug event");
 
@@ -149,13 +152,17 @@ CAMLprim value ml_report_dlls(value mlPath) {
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
+            DEBUG("get all the dlls");
             TerminateProcess(hProcess, 0);
+            DEBUG("terminate the process");
             break;
         }
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
+        DEBUG("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
+        DEBUG("End of the wait");
         CloseHandle(hProcess);
         CAMLreturn(mlResult);
     }
