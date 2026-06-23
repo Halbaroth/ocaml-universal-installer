@@ -148,9 +148,9 @@ CAMLprim value ml_report_dlls(value mlPath) {
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
-            BOOL res = TerminateProcess(hProcess, 0);
-            if (res == 0)
-              caml_failwith("cannot stop the process");
+            TerminateProcess(hProcess, 0);
+            WaitForSingleObject(hProcess, INFINITE);
+            CloseHandle(hProcess);
             CAMLreturn(mlResult);
         }
         break;
