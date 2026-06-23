@@ -205,9 +205,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         DEBUG("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
         DEBUG("End of the wait");
-        CloseHandle(hProcess);
         CAMLreturn(mlResult);
-        break;
 
       default:
         DEBUG("got %ld", ev.dwDebugEventCode);
