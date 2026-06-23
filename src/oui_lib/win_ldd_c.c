@@ -161,6 +161,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
+        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         DEBUG("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
         DEBUG("End of the wait");
