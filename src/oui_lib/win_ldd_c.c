@@ -84,7 +84,7 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
       free(buf);
       // raise_error("cannot retrieve the filename of the module with last error %ld", GetLastError());
       trace("cannot retrieve the filename of the module with last error %ld", GetLastError());
-      mlResult = caml_alloc_string("");
+      mlResult = caml_copy_string("");
     }
   } while (res == len);
 
