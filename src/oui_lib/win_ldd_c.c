@@ -73,18 +73,8 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
 
   do {
     len += 1024;
-    WCHAR* new_buf = realloc(buf, len * sizeof(*new_buf));
-    if (!new_buf) {
-      free(buf);
-      caml_failwith("cannot allocate memory for module filename");
-    }
-
-    buf = new_buf;
+    buf = realloc(buf, len * sizeof(*buf));
     res = GetModuleFileNameExW(hp, hm, buf, len);
-    if (res == 0) {
-      free(buf);
-      caml_failwith("cannot execute GetModuleFileNameExW");
-    }
   } while (res == len);
 
   TRACE("Found %ls at %p", buf, hm);
@@ -147,24 +137,19 @@ CAMLprim value ml_report_dlls(value mlPath) {
   mlResult = Val_emptylist;
 
   while (1) {
-    TRACE("wait for the next event");
     if (!WaitForDebugEvent(&ev, INFINITE))
       raise_error("Failed to wait for the next debug event with last-error code %ld", GetLastError());
-
-    TRACE("got an event...");
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
         TRACE("CREATE PROCESS");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-        BOOL b = WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
-        if (!b)
-          TRACE("FAILED TO INSERT ENTRY POINT %ld", GetLastError());
+        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
-        TRACE("LOAD DLL AT %p", ev.u.LoadDll.lpBaseOfDll);
+        TRACE("Loading dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_long(hm);
@@ -175,7 +160,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
       case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
-            TRACE("STATUS_BREAKPOINT");
+            TRACE("Reached the entrypoint of the program");
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             TerminateProcess(hProcess, 0);
             break;
@@ -183,7 +168,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("UNLOAD_DLL_DEBUG_EVENT: 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+        TRACE("Unloading dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
