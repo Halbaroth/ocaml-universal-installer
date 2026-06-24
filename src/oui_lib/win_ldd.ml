@@ -8,9 +8,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-exception Win_ldd of string * int
+exception Error of string
 
-let () = Callback.register_exception "win_ldd" (Win_ldd ("dummy", 0))
+let () = Callback.register_exception "Win_ldd.Error" (Error ("dummy", 0))
 
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
@@ -40,9 +40,10 @@ let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
   match report_dlls binary with
-  | exception Win_ldd (msg, _code) ->
+  | exception Error msg ->
       Format.eprintf "Failed with the following error: %s" msg;
-      assert false
+      []
+  | exception _ -> []
   | dlls ->
     List.filter_map (fun dll ->
       if is_system32 dll then None

@@ -19,6 +19,19 @@
     fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
   } while(0)
 
+static const BUFFER_SIZE = 1024
+
+static void raise_error(const char *fmt, ...) {
+  CAMLparam0();
+  CAMLlocal1(msg);
+  va_list args;
+  va_start(args, fmt);
+  char buff[BUFFER_SIZE] = {};
+  vsnprintf(BUFFER_SIZE, fmt, buff, args);
+  value msg = caml_copy_string(buff);
+  caml_raise_with_string(*caml_named_value("Win_ldd.Error"), msg);
+}
+
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
   CAMLparam0();
@@ -125,15 +138,6 @@ static HANDLE ml_start_process(value mlPath) {
   CAMLreturnT(HANDLE, pi.hProcess);
 }
 
-static void raise_error(char *msg) {
-  CAMLparam0();
-  CAMLlocal1(payload);
-  payload = caml_alloc(2, 0);
-  Field(payload, 0) = caml_copy_string(msg);
-  Field(payload, 1) = Val_int(1);
-  caml_raise_with_arg(*caml_named_value("win_ldd"), payload);
-}
-
 CAMLprim value ml_report_dlls(value mlPath) {
   CAMLparam1(mlPath);
   CAMLlocal3(mlCurr, mlCell, mlResult);
@@ -144,10 +148,8 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
   while (1) {
     TRACE("wait for the next event");
-    if (!WaitForDebugEvent(&ev, INFINITE)) {
-      TRACE("cannot wait!");
-      raise_error("cannot wait for debug event");
-    }
+    if (!WaitForDebugEvent(&ev, INFINITE))
+      raise_error("Failed to wait for the next debug event with last-error code %ld", GetLastError());
 
     TRACE("got an event...");
 
@@ -239,8 +241,6 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
   }
-
-  raise_error("leaved the main looping without reaching the breakpoint");
 }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
