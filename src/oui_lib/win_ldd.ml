@@ -34,7 +34,7 @@ external report_dlls : string -> string list = "ml_report_dlls"
 
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
-  Format.eprintf "Searching dlls of %s..." binary;
+  Format.eprintf "Searching dlls of %s...@." binary;
   let dlls = report_dlls binary in
   List.filter_map (fun dll ->
     if is_system32 dll then None

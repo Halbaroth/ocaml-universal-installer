@@ -136,12 +136,14 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
+        DEBUG("CREATE PROCESS");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
         WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
+        DEBUG("LOAD DLL");
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_long(hm);
@@ -201,9 +203,11 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
+        DEBUG("REACH EXIT");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         DEBUG("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
+        CloseHandle(hProcess);
         DEBUG("End of the wait");
         CAMLreturn(mlResult);
 
