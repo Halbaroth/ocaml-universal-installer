@@ -75,6 +75,10 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     len += 1024;
     buf = realloc(buf, len * sizeof(*buf));
     res = GetModuleFileNameExW(hp, hm, buf, len);
+    if (res == 0) {
+      free(buf);
+      raise_error("cannot retrieve the filename of the module with last error %ld", GetLastError());
+    }
   } while (res == len);
 
   TRACE("Found %ls at %p", buf, hm);
@@ -123,7 +127,7 @@ static HANDLE ml_start_process(value mlPath) {
   WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
   if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
-    caml_failwith("cannot start the process in debugging mode");
+    raise_error("cannot start the process");
 
   CAMLreturnT(HANDLE, pi.hProcess);
 }
