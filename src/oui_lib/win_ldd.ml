@@ -39,9 +39,13 @@ external report_dlls : string -> string list = "ml_report_dlls"
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
-  let dlls = report_dlls binary in
-  List.filter_map (fun dll ->
-    if is_system32 dll then None
-    else
-      let path = OpamFilename.of_string @@ System.normalize_path dll in
-      Some path) dlls
+  match report_dlls binary with
+  | exception Win_ldd (msg, _code) ->
+      Format.eprintf "Failed with the following error: %s" msg;
+      assert false
+  | dlls ->
+    List.filter_map (fun dll ->
+      if is_system32 dll then None
+      else
+        let path = OpamFilename.of_string @@ System.normalize_path dll in
+        Some path) dlls

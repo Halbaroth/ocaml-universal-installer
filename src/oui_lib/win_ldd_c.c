@@ -147,7 +147,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
     TRACE("wait for the next event");
     if (!WaitForDebugEvent(&ev, INFINITE)) {
       TRACE("cannot wait!");
-      caml_failwith("cannot wait for debug event");
+      raise_error("cannot wait for debug event");
     }
 
     TRACE("got an event...");
@@ -241,7 +241,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
   }
 
-  caml_failwith("leaved the main looping without reaching the breakpoint");
+  raise_error("leaved the main looping without reaching the breakpoint");
 }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
