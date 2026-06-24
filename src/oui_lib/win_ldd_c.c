@@ -19,7 +19,7 @@
     fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
   } while(0)
 
-static const BUFFER_SIZE = 1024
+static const BUFFER_SIZE = 1024;
 
 static void raise_error(const char *fmt, ...) {
   CAMLparam0();
