@@ -139,7 +139,11 @@ CAMLprim value ml_report_dlls(value mlPath) {
         DEBUG("CREATE PROCESS");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+        BOOL b = WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+        if (!b) {
+          DEBUG("FAILED TO INSERT ENTRY POINT");
+          DEBUG("LAST ERROR %ld", GetLastError());
+        }
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
