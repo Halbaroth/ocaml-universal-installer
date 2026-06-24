@@ -20,7 +20,7 @@ static const BUFFER_SIZE = 1024;
 static void trace(const char *restrict fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  fprintf(stderr, "Win ldd: " fmt "\n", args);
+  vfprintf(stderr, "Win ldd: " fmt "\n", args);
   fflush(NULL);
 }
 
