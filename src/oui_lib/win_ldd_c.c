@@ -174,67 +174,23 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
       case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
-          case STATUS_DLL_NOT_FOUND:
-            TRACE("DLL NOT FOUND");
-            break;
-
-          case EXCEPTION_ACCESS_VIOLATION:
-            TRACE("EXCEPTION_ACCESS_VIOLATION");
-            break;
-
-          case EXCEPTION_DATATYPE_MISALIGNMENT:
-            TRACE("EXCEPTION_DATATYPE_MISALIGNEMENT");
-            break;
-
-          case EXCEPTION_SINGLE_STEP:
-            TRACE("EXCEPTION_SINGLE_STEP");
-            break;
-
-          case DBG_CONTROL_C:
-            TRACE("DBG_CONTROL_C");
-            break;
-
           case STATUS_BREAKPOINT:
+            TRACE("STATUS_BREAKPOINT");
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
-            TRACE("get all the dlls");
             TerminateProcess(hProcess, 0);
-            TRACE("terminate the process");
-            break;
-
-          default:
-            TRACE("UNKNOWN");
             break;
         }
         break;
 
-      case RIP_EVENT:
-        TRACE("OTHER 1");
-        break;
       case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("OTHER 2");
-        break;
-      case OUTPUT_DEBUG_STRING_EVENT:
-        TRACE("OTHER 3");
-        break;
-      case EXIT_THREAD_DEBUG_EVENT:
-        TRACE("OTHER 4");
-        break;
-      case CREATE_THREAD_DEBUG_EVENT:
-        TRACE("OTHER 5");
+        TRACE("UNLOAD_DLL_DEBUG_EVENT: 0x%p", ev.u.UnloadDll.lpBaseOfDll);
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
-        TRACE("REACH EXIT");
+        TRACE("EXIT_PROCESS_DEBUG_EVENT");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-        TRACE("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
-        // CloseHandle(hProcess);
-        TRACE("End of the wait");
         CAMLreturn(mlResult);
-
-      default:
-        TRACE("UNKNOWN");
-        // TRACE("got %ld", ev.dwDebugEventCode);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
