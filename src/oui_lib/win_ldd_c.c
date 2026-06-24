@@ -13,8 +13,10 @@
 #include <windows.h>
 #include <psapi.h>
 
-#define DEBUG(fmt, ...) fprintf(stderr, fmt "\r\n", ##__VA_ARGS__)
-
+#define TRACE(fmt, ...) \
+  do { \
+    fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
+  } while(0)
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
@@ -71,7 +73,7 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     }
   } while (res == len);
 
-  DEBUG("Found %ls at %p", buf, hm);
+  TRACE("Found %ls at %p", buf, hm);
   mlResult = ml_wchar_to_value(buf, CP_UTF8);
   free(buf);
   CAMLreturn(mlResult);
@@ -116,43 +118,52 @@ static HANDLE ml_start_process(value mlPath) {
 
   WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
   if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
-      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
+      TRACE_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
     caml_failwith("cannot start the process in debugging mode");
 
   CAMLreturnT(HANDLE, pi.hProcess);
 }
 
+static void raise_error(char *msg) {
+  CAMLlocal1(payload);
+  payload = caml_alloc(2, 0);
+  Field(payload, 0) = caml_copy_string(msg);
+  Field(payload, 1) = Val_int(1);
+  caml_raise_with_arg(*caml_named_value("win_ldd"), payload);
+}
+
 CAMLprim value ml_report_dlls(value mlPath) {
+  raise_error("plop");
   CAMLparam1(mlPath);
   CAMLlocal3(mlCurr, mlCell, mlResult);
   HANDLE hProcess = ml_start_process(mlPath);
-  DEBUG_EVENT ev;
+  TRACE_EVENT ev;
   mlCurr = Val_emptylist;
   mlResult = Val_emptylist;
 
   while (1) {
-    DEBUG("wait for the next event");
+    TRACE("wait for the next event");
     if (!WaitForDebugEvent(&ev, INFINITE)) {
-      DEBUG("cannot wait!");
+      TRACE("cannot wait!");
       caml_failwith("cannot wait for debug event");
     }
 
-    DEBUG("got an event...");
+    TRACE("got an event...");
 
     switch (ev.dwDebugEventCode) {
-      case CREATE_PROCESS_DEBUG_EVENT:
-        DEBUG("CREATE PROCESS");
+      case CREATE_PROCESS_TRACE_EVENT:
+        TRACE("CREATE PROCESS");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
         BOOL b = WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         if (!b) {
-          DEBUG("FAILED TO INSERT ENTRY POINT");
-          DEBUG("LAST ERROR %ld", GetLastError());
+          TRACE("FAILED TO INSERT ENTRY POINT");
+          TRACE("LAST ERROR %ld", GetLastError());
         }
         break;
 
-      case LOAD_DLL_DEBUG_EVENT:
-        DEBUG("LOAD DLL AT %p", ev.u.LoadDll.lpBaseOfDll);
+      case LOAD_DLL_TRACE_EVENT:
+        TRACE("LOAD DLL AT %p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_long(hm);
@@ -160,68 +171,68 @@ CAMLprim value ml_report_dlls(value mlPath) {
         mlCurr = mlCell;
         break;
 
-      case EXCEPTION_DEBUG_EVENT:
+      case EXCEPTION_TRACE_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_DLL_NOT_FOUND:
-            DEBUG("DLL NOT FOUND");
+            TRACE("DLL NOT FOUND");
             break;
 
           case EXCEPTION_ACCESS_VIOLATION:
-            DEBUG("EXCEPTION_ACCESS_VIOLATION");
+            TRACE("EXCEPTION_ACCESS_VIOLATION");
             break;
 
           case EXCEPTION_DATATYPE_MISALIGNMENT:
-            DEBUG("EXCEPTION_DATATYPE_MISALIGNEMENT");
+            TRACE("EXCEPTION_DATATYPE_MISALIGNEMENT");
             break;
 
           case EXCEPTION_SINGLE_STEP:
-            DEBUG("EXCEPTION_SINGLE_STEP");
+            TRACE("EXCEPTION_SINGLE_STEP");
             break;
 
           case DBG_CONTROL_C:
-            DEBUG("DBG_CONTROL_C");
+            TRACE("DBG_CONTROL_C");
             break;
 
           case STATUS_BREAKPOINT:
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
-            DEBUG("get all the dlls");
+            TRACE("get all the dlls");
             TerminateProcess(hProcess, 0);
-            DEBUG("terminate the process");
+            TRACE("terminate the process");
             break;
 
           default:
-            DEBUG("UNKNOWN");
+            TRACE("UNKNOWN");
             break;
         }
         break;
 
       case RIP_EVENT:
-        DEBUG("OTHER 1");
+        TRACE("OTHER 1");
         break;
-      case UNLOAD_DLL_DEBUG_EVENT:
-        DEBUG("OTHER 2");
+      case UNLOAD_DLL_TRACE_EVENT:
+        TRACE("OTHER 2");
         break;
-      case OUTPUT_DEBUG_STRING_EVENT:
-        DEBUG("OTHER 3");
+      case OUTPUT_TRACE_STRING_EVENT:
+        TRACE("OTHER 3");
         break;
-      case EXIT_THREAD_DEBUG_EVENT:
-        DEBUG("OTHER 4");
+      case EXIT_THREAD_TRACE_EVENT:
+        TRACE("OTHER 4");
         break;
-      case CREATE_THREAD_DEBUG_EVENT:
-        DEBUG("OTHER 5");
+      case CREATE_THREAD_TRACE_EVENT:
+        TRACE("OTHER 5");
         break;
 
-      case EXIT_PROCESS_DEBUG_EVENT:
-        DEBUG("REACH EXIT");
+      case EXIT_PROCESS_TRACE_EVENT:
+        TRACE("REACH EXIT");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-        DEBUG("Reach the end of the process and wait");
+        TRACE("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
         CloseHandle(hProcess);
-        DEBUG("End of the wait");
+        TRACE("End of the wait");
         CAMLreturn(mlResult);
 
       default:
-        DEBUG("got %ld", ev.dwDebugEventCode);
+        TRACE("got %ld", ev.dwDebugEventCode);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);

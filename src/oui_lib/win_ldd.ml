@@ -8,6 +8,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+exception Win_ldd of string * int
+
+let () = Callback.register_exception "win_ldd" (Win_ldd ("dummy", 0))
+
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
 let is_system32 =
