@@ -17,19 +17,19 @@
 #define TRACE(fmt, ...) \
   do { \
     fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
+    fflush(NULL); \
   } while(0)
 
 static const BUFFER_SIZE = 1024;
 
 static void raise_error(const char *fmt, ...) {
   CAMLparam0();
-  CAMLlocal1(msg);
   va_list args;
   va_start(args, fmt);
   char buff[BUFFER_SIZE] = {};
   vsnprintf(BUFFER_SIZE, fmt, buff, args);
-  value msg = caml_copy_string(buff);
-  caml_raise_with_string(*caml_named_value("Win_ldd.Error"), msg);
+  caml_raise_with_string(*caml_named_value("Win_ldd.Error"),
+    caml_copy_string(buff));
 }
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
@@ -159,10 +159,8 @@ CAMLprim value ml_report_dlls(value mlPath) {
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
         BOOL b = WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
-        if (!b) {
-          TRACE("FAILED TO INSERT ENTRY POINT");
-          TRACE("LAST ERROR %ld", GetLastError());
-        }
+        if (!b)
+          TRACE("FAILED TO INSERT ENTRY POINT %ld", GetLastError());
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
@@ -230,7 +228,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         TRACE("Reach the end of the process and wait");
         WaitForSingleObject(hProcess, INFINITE);
-        CloseHandle(hProcess);
+        // CloseHandle(hProcess);
         TRACE("End of the wait");
         CAMLreturn(mlResult);
 
