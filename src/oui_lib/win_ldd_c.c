@@ -126,6 +126,7 @@ static HANDLE ml_start_process(value mlPath) {
 }
 
 static void raise_error(char *msg) {
+  CAMLparam0();
   CAMLlocal1(payload);
   payload = caml_alloc(2, 0);
   Field(payload, 0) = caml_copy_string(msg);
