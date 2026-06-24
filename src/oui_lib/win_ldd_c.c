@@ -13,10 +13,7 @@
 #include <windows.h>
 #include <psapi.h>
 
-#define TRACE(fmt, ...) \
-  do { \
-    fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
-  } while(0)
+#define TRACE(fmt, ...) fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__)
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
