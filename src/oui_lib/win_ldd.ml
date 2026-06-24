@@ -10,7 +10,7 @@
 
 exception Error of string
 
-let () = Callback.register_exception "Win_ldd.Error" (Error ("dummy", 0))
+let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
 
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
