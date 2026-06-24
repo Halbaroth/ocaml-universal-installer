@@ -71,6 +71,7 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     }
   } while (res == len);
 
+  DEBUG("Found %ls at %p", buf, hm);
   mlResult = ml_wchar_to_value(buf, CP_UTF8);
   free(buf);
   CAMLreturn(mlResult);
