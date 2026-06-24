@@ -13,7 +13,10 @@
 #include <windows.h>
 #include <psapi.h>
 
-#define TRACE(fmt, ...) fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__)
+#define TRACE(fmt, ...) \
+  do { \
+    fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
+  } while(0)
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
@@ -130,9 +133,9 @@ static void raise_error(char *msg) {
 }
 
 CAMLprim value ml_report_dlls(value mlPath) {
-  raise_error("plop");
   CAMLparam1(mlPath);
   CAMLlocal3(mlCurr, mlCell, mlResult);
+  raise_error("plop");
   HANDLE hProcess = ml_start_process(mlPath);
   TRACE_EVENT ev;
   mlCurr = Val_emptylist;
