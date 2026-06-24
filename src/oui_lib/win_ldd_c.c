@@ -16,7 +16,7 @@
 
 #define TRACE(fmt, ...) \
   do { \
-    fprintf(stderr, "WIN LDD TRACE: " fmt "\n", ##__VA_ARGS__); \
+    fprintf(stderr, "Win ldd: " fmt "\n", ##__VA_ARGS__); \
     fflush(NULL); \
   } while(0)
 
@@ -63,6 +63,9 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
   CAMLreturnT(WCHAR *, result);
 }
 
+#define Val_HMODULE(x) Val_long((HMODULE)x)
+#define HMODULE_Val(x) (HMODULE)Long_val(x)
+
 static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
   CAMLparam0();
   CAMLlocal1(mlResult);
@@ -77,7 +80,9 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     res = GetModuleFileNameExW(hp, hm, buf, len);
     if (res == 0) {
       free(buf);
-      raise_error("cannot retrieve the filename of the module with last error %ld", GetLastError());
+      // raise_error("cannot retrieve the filename of the module with last error %ld", GetLastError());
+      TRACE("cannot retrieve the filename of the module with last error %ld", GetLastError());
+      mlResult = caml_alloc_string("");
     }
   } while (res == len);
 
@@ -93,7 +98,7 @@ static value ml_get_module_filenames(HANDLE hp, value mlList) {
   mlCurr = Val_emptylist;
 
   while(!Is_long(mlList)) {
-    HMODULE hm = (HMODULE)Long_val(Field(mlList, 0));
+    HMODULE hm = HMODULE_Val(Field(mlList, 0));
     mlCell= caml_alloc(2, 0);
     Field(mlCell, 0) = ml_get_module_filename(hp, hm);
     Field(mlCell, 1) = mlCurr;
@@ -156,7 +161,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         TRACE("loading dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
-        Field(mlCell, 0) = Val_long(hm);
+        Field(mlCell, 0) = Val_HMODULE(hm);
         Field(mlCell, 1) = mlCurr;
         mlCurr = mlCell;
         break;
