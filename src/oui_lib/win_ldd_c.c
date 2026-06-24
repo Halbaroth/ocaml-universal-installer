@@ -131,8 +131,12 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
   while (1) {
     DEBUG("wait for the next event");
-    if (!WaitForDebugEvent(&ev, INFINITE))
+    if (!WaitForDebugEvent(&ev, INFINITE)) {
+      DEBUG("cannot wait!");
       caml_failwith("cannot wait for debug event");
+    }
+
+    DEBUG("got an event...");
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
@@ -147,7 +151,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
-        DEBUG("LOAD DLL");
+        DEBUG("LOAD DLL AT %p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_long(hm);
