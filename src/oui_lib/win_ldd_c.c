@@ -118,7 +118,7 @@ static HANDLE ml_start_process(value mlPath) {
 
   WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
   if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
-      TRACE_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
+      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
     caml_failwith("cannot start the process in debugging mode");
 
   CAMLreturnT(HANDLE, pi.hProcess);
@@ -137,7 +137,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
   CAMLlocal3(mlCurr, mlCell, mlResult);
   raise_error("plop");
   HANDLE hProcess = ml_start_process(mlPath);
-  TRACE_EVENT ev;
+  DEBUG_EVENT ev;
   mlCurr = Val_emptylist;
   mlResult = Val_emptylist;
 
@@ -151,7 +151,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
     TRACE("got an event...");
 
     switch (ev.dwDebugEventCode) {
-      case CREATE_PROCESS_TRACE_EVENT:
+      case CREATE_PROCESS_DEBUG_EVENT:
         TRACE("CREATE PROCESS");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
@@ -162,7 +162,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         }
         break;
 
-      case LOAD_DLL_TRACE_EVENT:
+      case LOAD_DLL_DEBUG_EVENT:
         TRACE("LOAD DLL AT %p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
@@ -171,7 +171,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         mlCurr = mlCell;
         break;
 
-      case EXCEPTION_TRACE_EVENT:
+      case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_DLL_NOT_FOUND:
             TRACE("DLL NOT FOUND");
@@ -209,20 +209,20 @@ CAMLprim value ml_report_dlls(value mlPath) {
       case RIP_EVENT:
         TRACE("OTHER 1");
         break;
-      case UNLOAD_DLL_TRACE_EVENT:
+      case UNLOAD_DLL_DEBUG_EVENT:
         TRACE("OTHER 2");
         break;
-      case OUTPUT_TRACE_STRING_EVENT:
+      case OUTPUT_DEBUG_STRING_EVENT:
         TRACE("OTHER 3");
         break;
-      case EXIT_THREAD_TRACE_EVENT:
+      case EXIT_THREAD_DEBUG_EVENT:
         TRACE("OTHER 4");
         break;
-      case CREATE_THREAD_TRACE_EVENT:
+      case CREATE_THREAD_DEBUG_EVENT:
         TRACE("OTHER 5");
         break;
 
-      case EXIT_PROCESS_TRACE_EVENT:
+      case EXIT_PROCESS_DEBUG_EVENT:
         TRACE("REACH EXIT");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         TRACE("Reach the end of the process and wait");
