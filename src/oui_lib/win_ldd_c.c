@@ -137,7 +137,6 @@ static void raise_error(char *msg) {
 CAMLprim value ml_report_dlls(value mlPath) {
   CAMLparam1(mlPath);
   CAMLlocal3(mlCurr, mlCell, mlResult);
-  raise_error("plop");
   HANDLE hProcess = ml_start_process(mlPath);
   DEBUG_EVENT ev;
   mlCurr = Val_emptylist;
