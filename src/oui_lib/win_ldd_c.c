@@ -30,8 +30,7 @@ static void raise_error(const char *restrict fmt, ...) {
   va_start(args, fmt);
   char buff[BUFFER_SIZE] = {};
   vsnprintf(buff, BUFFER_SIZE, fmt, args);
-  caml_raise_with_string(*caml_named_value("Win_ldd.Error"),
-    caml_copy_string(buff));
+  caml_raise_with_string(*caml_named_value("Win_ldd.Error"), buff);
 }
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
