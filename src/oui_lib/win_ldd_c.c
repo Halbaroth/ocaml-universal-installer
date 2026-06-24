@@ -232,7 +232,8 @@ CAMLprim value ml_report_dlls(value mlPath) {
         CAMLreturn(mlResult);
 
       default:
-        TRACE("got %ld", ev.dwDebugEventCode);
+        TRACE("UNKNOWN");
+        // TRACE("got %ld", ev.dwDebugEventCode);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
