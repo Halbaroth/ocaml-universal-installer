@@ -81,7 +81,7 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     }
   } while (res == len);
 
-  TRACE("Found %ls at %p", buf, hm);
+  TRACE("found %ls at %p", buf, hm);
   mlResult = ml_wchar_to_value(buf, CP_UTF8);
   free(buf);
   CAMLreturn(mlResult);
@@ -146,14 +146,14 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
-        TRACE("CREATE PROCESS");
+        TRACE("process created");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
         WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
-        TRACE("Loading dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
+        TRACE("loading dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_long(hm);
@@ -164,7 +164,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
       case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
-            TRACE("Reached the entrypoint of the program");
+            TRACE("reached the entrypoint of the program");
             mlResult = ml_get_module_filenames(hProcess, mlCurr);
             TerminateProcess(hProcess, 0);
             break;
@@ -172,11 +172,11 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("Unloading dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+        TRACE("unloading dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
-        TRACE("EXIT_PROCESS_DEBUG_EVENT");
+        TRACE("exit process");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         WaitForSingleObject(hProcess, INFINITE);
         CAMLreturn(mlResult);
