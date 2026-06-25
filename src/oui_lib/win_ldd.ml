@@ -118,4 +118,5 @@ let get_dlls binary =
 let get_dlls binary =
   try get_dlls binary
   with exn ->
-    Format.eprintf "%s" (Printexc.to_string exn)
+    Format.eprintf "%s" (Printexc.to_string exn);
+    []
