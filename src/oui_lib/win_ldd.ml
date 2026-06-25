@@ -107,20 +107,10 @@ let get_dlls binary =
       let path = Dll.filename p dll in
       if is_system32 path then None
       else
-        let path = OpamFilename.of_string @@ System.normalize_path path in
-        Some path)
+        let p = OpamFilename.of_string @@ System.normalize_path path in
+        Format.eprintf "Found %s@." path;
+        Some p)
   in
   (* Hashtbl.iter (fun dll () -> Dll.close dll) dlls; *)
   (* Process.close p; *)
   res
-  (* match report_dlls binary with *)
-  (* | exception Error msg -> *)
-  (*     Format.eprintf "Failed with the following error: %s" msg; *)
-  (*     [] *)
-  (* | exception _ -> [] *)
-  (* | dlls -> *)
-  (*   List.filter_map (fun dll -> *)
-  (*     if is_system32 dll then None *)
-  (*     else *)
-  (*       let path = OpamFilename.of_string @@ System.normalize_path dll in *)
-  (*       Some path) dlls *)
