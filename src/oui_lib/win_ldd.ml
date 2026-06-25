@@ -86,8 +86,8 @@ let get_dlls binary =
         Format.eprintf "Found %s@." path;
         Some p)
   in
-  Hashtbl.iter (fun dll () -> close_dll dll) dlls;
-  close_process p;
+  (* Hashtbl.iter (fun dll () -> close_dll dll) dlls; *)
+  (* close_process p; *)
   res
 
 let get_dlls binary =
