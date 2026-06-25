@@ -87,21 +87,17 @@ let get_dlls binary =
   let p = Process.start binary in
   let wait_event = DebugEvent.wait p in
   let rec loop () : unit =
-    let () =
-      match wait_event () with
-      | Unknown ->  Format.eprintf "Unknown@."
-      | CreateProcess -> Format.eprintf "CreateProcess@."
-      | ExitProcess -> assert false
-      | LoadDll dll ->  (
-          Format.eprintf "LoadDll@.";
-          Hashtbl.replace dlls dll ())
-      | UnloadDll dll -> (
-          Format.eprintf "UnloadDll@.";
-          Hashtbl.remove dlls dll)
-      | Exception _  ->
-          Format.eprintf "exception@."
-    in
-    loop ()
+    match wait_event () with
+    | Unknown | CreateProcess -> loop ()
+    | ExitProcess -> assert false
+    | LoadDll dll ->  (
+      Hashtbl.replace dlls dll ();
+      loop ())
+    | UnloadDll dll -> (
+      Hashtbl.remove dlls dll;
+      loop ())
+    | Exception _  ->
+      Format.eprintf "exception@."
   in
   loop ();
   let res =
