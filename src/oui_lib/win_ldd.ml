@@ -14,7 +14,7 @@ let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
 
 type process
 external start_process : string -> process = "ml_start_process"
-external close_process : process -> unit = "nl_close_process"
+external close_process : process -> unit = "ml_close_process"
 
 type dll
 external close_dll : dll -> unit = "ml_close_dll"
