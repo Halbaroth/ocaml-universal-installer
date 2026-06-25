@@ -19,7 +19,7 @@ module DebugEvent : sig
     | UnloadDll of dll
     | Exception of int
 
-  val trace : string -> unit -> t
+  val trace : string -> unit -> event
 end = struct
   type dll
   type process
@@ -35,7 +35,7 @@ end = struct
 
   external start_process : string -> process = "ml_start_process"
   (* external stop_process : process -> unit = "ml_stop_process" *)
-  external next_debug_event : process -> unit -> t = "ml_next_debug_event"
+  external next_debug_event : process -> unit -> event = "ml_next_debug_event"
 
   let trace path =
     let p = start_process path in

@@ -45,9 +45,10 @@ static void raise_error(const char *restrict fmt, ...) {
 #define Val_LPVOID(x) Val_long((LPVOID)x)
 
 static value Val_DebugEventCode(DWORD debugEventCode, ...) {
+  CAMLparam0();
+  CAMLlocal1(res);
   va_list args;
   va_start(args, debugEventCode);
-  value res;
 
   switch (debugEventCode) {
     case CREATE_PROCESS_DEBUG_EVENT:
@@ -73,6 +74,22 @@ static value Val_DebugEventCode(DWORD debugEventCode, ...) {
 
   va_end(args);
   CAMLreturn(res);
+}
+
+WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
+{
+  CAMLparam1(mlString);
+  WCHAR *result = NULL;
+  int w_len = MultiByteToWideChar(codepage, 0, String_val(mlString), -1, NULL, 0);
+  if (w_len == 0) {
+    result = NULL;
+  } else {
+    result = (WCHAR *)malloc(w_len * sizeof(WCHAR));
+    if (result != NULL) {
+      MultiByteToWideChar(codepage, 0, String_val(mlString), -1, result, w_len);
+    }
+  }
+  CAMLreturnT(WCHAR *, result);
 }
 
 CAMLprim value ml_start_process(value mlPath) {
@@ -104,7 +121,7 @@ static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
 static const unsigned char int3 = 0xcc;
 
 CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
-  CAMLparam2(mlProcess, mlUnit);
+  CAMLparam2(mlhProcess, mlUnit);
   CAMLlocal1(res);
   HANDLE hProcess = HANDLE_Val(mlhProcess);
   DEBUG_EVENT ev;
@@ -153,22 +170,6 @@ value ml_wchar_to_value(const WCHAR *string, UINT codepage)
     WideCharToMultiByte(CP_UTF8, 0, string, w_len, (char *)Bytes_val(mlResult), len, NULL, NULL);
   }
   CAMLreturn(mlResult);
-}
-
-WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
-{
-  CAMLparam1(mlString);
-  WCHAR *result = NULL;
-  int w_len = MultiByteToWideChar(codepage, 0, String_val(mlString), -1, NULL, 0);
-  if (w_len == 0) {
-    result = NULL;
-  } else {
-    result = (WCHAR *)malloc(w_len * sizeof(WCHAR));
-    if (result != NULL) {
-      MultiByteToWideChar(codepage, 0, String_val(mlString), -1, result, w_len);
-    }
-  }
-  CAMLreturnT(WCHAR *, result);
 }
 
 // #define Val_HMODULE(x) Val_long((HMODULE)x)
