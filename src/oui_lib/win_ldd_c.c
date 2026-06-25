@@ -92,7 +92,7 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
   CAMLreturnT(WCHAR *, result);
 }
 
-CAMLprim value ml_start_process(value mlPath) {
+CAMLprim value ml_process_start(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
   PROCESS_INFORMATION pi;
@@ -104,10 +104,55 @@ CAMLprim value ml_start_process(value mlPath) {
   WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
   if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
-    raise_error("cannot start the process");
+    raise_error("cannot start the process %ls", path);
 
   CAMLreturn(Val_HANDLE(pi.hProcess));
 }
+
+CAMLprim value ml_process_stop(value mlProcess) {
+  CAMLparam1(mlProcess);
+  HANDLE process = HANDLE_Val(mlProcess);
+  ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
+  TerminateProcess(process, 0);
+  WaitForSingleObject(hProcess, INFINITE);
+  CAMLreturn(Val_unit);
+}
+
+CAMLprime value ml_dll_close(value mlDll) {
+  CAMLparam1(mlDll);
+  HMODULE dll = HMODULE_Val(mlDll);
+  CloseHandle(dll);
+  CAMLreturn(Val_unit);
+}
+
+CAMLprim value ml_get_module_filename(value mlProcess, value mlDll) {
+  CAMLparam2(mlProcess, mlDll);
+  CAMLlocal1(mlResult);
+  HANDLE process = HANDLE_Val(mlProcess);
+  HMODULE dll = HMODULE_Val(mlDll);
+
+  size_t len = 0;
+  DWORD res;
+  WCHAR* buf = NULL;
+
+  do {
+    len += 1024;
+    buf = realloc(buf, len * sizeof(*buf));
+    res = GetModuleFileNameExW(process, dll, buf, len);
+    if (res == 0)
+      goto failure;
+  } while (res == len);
+
+  mlResult = ml_wchar_to_value(buf, CP_UTF8);
+  free(buf);
+  CAMLreturn(mlResult);
+
+failure:
+  free(buf);
+  raise_error("cannot retrieve the filename of the module with \
+    Last-Error code %ld", GetLastError());
+}
+
 
 static const size_t DOS_HEADER_SIZE = 4096;
 
@@ -120,7 +165,7 @@ static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
 
 static const unsigned char int3 = 0xcc;
 
-CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
+CAMLprim value ml_debugevent_wait(value mlhProcess, value mlUnit) {
   CAMLparam2(mlhProcess, mlUnit);
   CAMLlocal1(res);
   HANDLE hProcess = HANDLE_Val(mlhProcess);

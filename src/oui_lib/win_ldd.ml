@@ -8,44 +8,55 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module DebugEvent : sig
-  type dll
-
-  type event =
-    | Unknown
-    | CreateProcess
-    | ExitProcess
-    | EntryPoint
-    | LoadDll of dll
-    | UnloadDll of dll
-    | Exception of int
-
-  val trace : string -> unit -> event
-end = struct
-  type dll
-  type process
-
-  type event =
-    | Unknown
-    | CreateProcess
-    | ExitProcess
-    | EntryPoint
-    | LoadDll of dll
-    | UnloadDll of dll
-    | Exception of int
-
-  external start_process : string -> process = "ml_start_process"
-  (* external stop_process : process -> unit = "ml_stop_process" *)
-  external next_debug_event : process -> unit -> event = "ml_next_debug_event"
-
-  let trace path =
-    let p = start_process path in
-    next_debug_event p
-end
-
 exception Error of string
 
 let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
+
+module Process : sig
+  type t
+
+  val start : string -> t
+  val close : t -> unit
+end = struct
+  type t
+
+  external start : string -> t = "ml_process_start"
+  external close : t -> unit = "ml_process_stop"
+end
+
+module Dll : sig
+  type t
+
+  val close : t -> unit
+  val filename : Process.t -> t -> string
+end = struct
+  type t
+
+  external close : t -> unit = "ml_dll_close"
+  external filename : Process.t -> t -> string = "ml_dll_filename"
+end
+
+module DebugEvent : sig
+  type t =
+    | Unknown
+    | CreateProcess
+    | ExitProcess
+    | LoadDll of Dll.t
+    | UnloadDll of Dll.t
+    | Exception of int
+
+  val wait : Process.t -> unit -> t
+end = struct
+  type t =
+    | Unknown
+    | CreateProcess
+    | ExitProcess
+    | LoadDll of Dll.t
+    | UnloadDll of Dll.t
+    | Exception of int
+
+  external wait : Process.t -> unit -> t = "ml_debugevent_wait"
+end
 
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
@@ -74,14 +85,14 @@ let _is_system32 =
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
-  let t = DebugEvent.trace binary in
+  let p = Process.start binary in
+  let t = DebugEvent.wait p in
   let rec loop () : unit =
     let () =
       match t () with
       | Unknown ->  Format.eprintf "Unknown@."
       | CreateProcess -> Format.eprintf "CreateProcess@."
       | ExitProcess -> Format.eprintf "ExitProcess@."
-      | EntryPoint -> Format.eprintf "EntryPoint@."
       | LoadDll _ -> Format.eprintf "LoadDll@."
       | UnloadDll _ -> Format.eprintf "UnloadDll@."
       | Exception _  -> Format.eprintf "exception@."
