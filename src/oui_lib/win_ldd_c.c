@@ -66,6 +66,28 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
 #define Val_HMODULE(x) Val_long((HMODULE)x)
 #define HMODULE_Val(x) (HMODULE)Long_val(x)
 
+static void foo(HANDLE hp, HMODULE hm) {
+  size_t len = 0;
+  DWORD res;
+  WCHAR* buf = NULL;
+
+  do {
+    len += 1024;
+    buf = realloc(buf, len * sizeof(*buf));
+    res = GetModuleFileNameExW(hp, hm, buf, len);
+    if (res == 0)
+      goto failure;
+  } while (res == len);
+
+  TRACE("found early %ls at %p", buf, hm);
+  free(buf);
+  return;
+
+failure:
+  TRACE("cannot found it yet!");
+  free(buf);
+}
+
 static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
   CAMLparam0();
   CAMLlocal1(mlResult);
@@ -78,18 +100,19 @@ static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
     len += 1024;
     buf = realloc(buf, len * sizeof(*buf));
     res = GetModuleFileNameExW(hp, hm, buf, len);
-    if (res == 0) {
-      free(buf);
-      // raise_error("cannot retrieve the filename of the module with last error %ld", GetLastError());
-      TRACE("cannot retrieve the filename of the module with last error %ld", GetLastError());
-      mlResult = caml_copy_string("");
-    }
+    if (res == 0)
+      goto failure;
   } while (res == len);
 
   TRACE("found %ls at %p", buf, hm);
   mlResult = ml_wchar_to_value(buf, CP_UTF8);
   free(buf);
   CAMLreturn(mlResult);
+
+failure:
+  free(buf);
+  raise_error("cannot retrieve the filename of the module \
+    with Last-Error code %ld", GetLastError());
 }
 
 static value ml_get_module_filenames(HANDLE hp, value mlList) {
@@ -147,7 +170,8 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
-      raise_error("Failed to wait for the next debug event with last-error code %ld", GetLastError());
+      raise_error("Failed to wait for the next debug event with \
+        Last-Error code %ld", GetLastError());
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
@@ -158,8 +182,9 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
-        TRACE("loading dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
+        TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
+        foo(hProcess, hm);
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_HMODULE(hm);
         Field(mlCell, 1) = mlCurr;
@@ -177,7 +202,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         break;
 
       case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("unloading dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+        TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
         break;
 
       case EXIT_PROCESS_DEBUG_EVENT:
