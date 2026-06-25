@@ -129,11 +129,11 @@ CAMLprim value ml_process_stop(value mlProcess) {
   HANDLE process = HANDLE_Val(mlProcess);
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
   TerminateProcess(process, 0);
-  WaitForSingleObject(hProcess, INFINITE);
+  WaitForSingleObject(process, INFINITE);
   CAMLreturn(Val_unit);
 }
 
-CAMLprime value ml_dll_close(value mlDll) {
+CAMLprim value ml_dll_close(value mlDll) {
   CAMLparam1(mlDll);
   HMODULE dll = HMODULE_Val(mlDll);
   CloseHandle(dll);
@@ -171,19 +171,19 @@ failure:
 
 static const size_t DOS_HEADER_SIZE = 4096;
 
-static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
+static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
   PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
-  ReadProcessMemory(hProcess, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
+  ReadProcessMemory(process, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
   PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
   return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
 }
 
 static const unsigned char int3 = 0xcc;
 
-CAMLprim value ml_debugevent_wait(value mlhProcess, value mlUnit) {
-  CAMLparam2(mlhProcess, mlUnit);
+CAMLprim value ml_debugevent_wait(value mlProcess, value mlUnit) {
+  CAMLparam2(mlProcess, mlUnit);
   CAMLlocal1(res);
-  HANDLE hProcess = HANDLE_Val(mlhProcess);
+  HANDLE process = HANDLE_Val(mlProcess);
   DEBUG_EVENT ev;
   WaitForDebugEvent(&ev, INFINITE);
   DWORD debugEventCode = ev.dwDebugEventCode;
@@ -191,8 +191,8 @@ CAMLprim value ml_debugevent_wait(value mlhProcess, value mlUnit) {
   switch(debugEventCode) {
     case CREATE_PROCESS_DEBUG_EVENT:
       PVOID entry_point =
-          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-      WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+          process_entry_point(process, ev.u.CreateProcessInfo.lpBaseOfImage);
+      WriteProcessMemory(process, entry_point, &int3, sizeof(int3), NULL);
       res = Val_DebugEventCode(debugEventCode);
       break;
     case LOAD_DLL_DEBUG_EVENT:
