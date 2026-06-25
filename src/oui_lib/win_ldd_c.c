@@ -135,7 +135,6 @@ CAMLprim value ml_close_process(value mlProcess) {
   CAMLparam1(mlProcess);
   HANDLE process = HANDLE_Val(mlProcess);
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
-  TerminateProcess(process, 0);
   WaitForSingleObject(process, INFINITE);
   CAMLreturn(Val_unit);
 }
@@ -211,6 +210,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
     case EXCEPTION_DEBUG_EVENT:
       DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
       res = Val_DebugEventCode(debugEventCode, exceptionCode);
+      TerminateProcess(process, 0);
       break;
     case EXIT_PROCESS_DEBUG_EVENT:
     default:
