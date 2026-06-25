@@ -15,14 +15,15 @@
 #include <windows.h>
 #include <psapi.h>
 
-static const BUFFER_SIZE = 1024;
-
 static void trace(const char *restrict fmt, ...) {
   va_list args;
   va_start(args, fmt);
   vfprintf(stderr, "Win ldd: " fmt "\n", args);
+  va_end(args);
   fflush(NULL);
 }
+
+static const size_t BUFFER_SIZE = 1024;
 
 static void raise_error(const char *restrict fmt, ...) {
   CAMLparam0();
