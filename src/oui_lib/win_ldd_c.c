@@ -114,7 +114,7 @@ value ml_wchar_to_value(const WCHAR *string, UINT codepage)
   CAMLreturn(mlResult);
 }
 
-CAMLprim value ml_process_start(value mlPath) {
+CAMLprim value ml_start_process(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
   PROCESS_INFORMATION pi;
@@ -131,7 +131,7 @@ CAMLprim value ml_process_start(value mlPath) {
   CAMLreturn(Val_HANDLE(pi.hProcess));
 }
 
-CAMLprim value ml_process_stop(value mlProcess) {
+CAMLprim value ml_stop_process(value mlProcess) {
   CAMLparam1(mlProcess);
   HANDLE process = HANDLE_Val(mlProcess);
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
@@ -140,14 +140,14 @@ CAMLprim value ml_process_stop(value mlProcess) {
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value ml_dll_close(value mlDll) {
+CAMLprim value ml_close_dll(value mlDll) {
   CAMLparam1(mlDll);
   HMODULE dll = HMODULE_Val(mlDll);
   CloseHandle(dll);
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value ml_dll_filename(value mlProcess, value mlDll) {
+CAMLprim value ml_filename_dll(value mlProcess, value mlDll) {
   CAMLparam2(mlProcess, mlDll);
   CAMLlocal1(mlResult);
   HANDLE process = HANDLE_Val(mlProcess);
@@ -171,8 +171,7 @@ CAMLprim value ml_dll_filename(value mlProcess, value mlDll) {
 
 failure:
   free(buf);
-  raise_error("cannot retrieve the filename of the module with \
-    Last-Error code %ld", GetLastError());
+  raise_error("cannot retrieve the filename of the module with Last-Error code %ld", GetLastError());
 }
 
 
@@ -187,7 +186,7 @@ static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
 
 static const unsigned char int3 = 0xcc;
 
-CAMLprim value ml_debugevent_wait(value mlProcess, value mlUnit) {
+CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
   CAMLparam2(mlProcess, mlUnit);
   CAMLlocal1(res);
   HANDLE process = HANDLE_Val(mlProcess);
@@ -204,6 +203,7 @@ CAMLprim value ml_debugevent_wait(value mlProcess, value mlUnit) {
       break;
     case LOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.LoadDll.lpBaseOfDll);
+      TRACE("load dll 0x%p", ev.u.LoadDell.lpBaseOfDll);
       break;
     case UNLOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.UnloadDll.lpBaseOfDll);

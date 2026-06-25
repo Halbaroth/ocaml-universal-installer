@@ -12,60 +12,27 @@ exception Error of string
 
 let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
 
-module Process : sig
-  type t
+type process
+external start_process : string -> process = "ml_start_process"
+external close_process : process -> unit = "nl_close_process"
 
-  val start : string -> t
-  val close : t -> unit
-end = struct
-  type t
+type dll
+external close_dll : dll -> unit = "ml_close_dll"
+external filename_dll : process -> dll -> string = "ml_filename_dll"
 
-  external start : string -> t = "ml_process_start"
-  external close : t -> unit = "ml_process_stop"
-end
+type exn =
+  | Unknown
+  | Breakpoint
 
-module Dll : sig
-  type t
+type t =
+  | Unknown
+  | CreateProcess
+  | ExitProcess
+  | LoadDll of dll
+  | UnloadDll of dll
+  | Exception of exn
 
-  val close : t -> unit
-  val filename : Process.t -> t -> string
-end = struct
-  type t
-
-  external close : t -> unit = "ml_dll_close"
-  external filename : Process.t -> t -> string = "ml_dll_filename"
-end
-
-module DebugEvent : sig
-  type exn =
-    | Unknown
-    | Breakpoint
-
-  type t =
-    | Unknown
-    | CreateProcess
-    | ExitProcess
-    | LoadDll of Dll.t
-    | UnloadDll of Dll.t
-    | Exception of exn
-
-  val wait : Process.t -> unit -> t
-end = struct
-  type exn =
-    | Unknown
-    | Breakpoint
-
-  type t =
-    | Unknown
-    | CreateProcess
-    | ExitProcess
-    | LoadDll of Dll.t
-    | UnloadDll of Dll.t
-    | Exception of exn
-
-  external wait : Process.t -> unit -> t = "ml_debugevent_wait"
-end
-
+external wait_debug_event : process -> unit -> t = "ml_wait_debug_event"
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
 let is_system32 =
@@ -91,9 +58,9 @@ let is_system32 =
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
-  let dlls : (Dll.t, unit) Hashtbl.t = Hashtbl.create 17 in
-  let p = Process.start binary in
-  let wait_event = DebugEvent.wait p in
+  let dlls : (dll, unit) Hashtbl.t = Hashtbl.create 17 in
+  let p = start_process binary in
+  let wait_event = wait_debug_event p in
   let rec loop () : unit =
     match wait_event () with
     | ExitProcess -> assert false
@@ -104,7 +71,7 @@ let get_dlls binary =
       Hashtbl.remove dlls dll;
       loop ())
     | Exception Breakpoint  ->
-      Format.eprintf "exception@."
+      Format.eprintf "Breakpoint!@."
     | Unknown | CreateProcess | Exception _ -> loop ()
   in
   loop ();
@@ -112,15 +79,15 @@ let get_dlls binary =
     Hashtbl.to_seq dlls
     |> List.of_seq
     |> List.filter_map (fun (dll, ()) ->
-      let path = Dll.filename p dll in
+      let path = filename_dll p dll in
       if is_system32 path then None
       else
         let p = OpamFilename.of_string @@ System.normalize_path path in
         Format.eprintf "Found %s@." path;
         Some p)
   in
-  (* Hashtbl.iter (fun dll () -> Dll.close dll) dlls; *)
-  (* Process.close p; *)
+  Hashtbl.iter (fun dll () -> close_dll dll) dlls;
+  close_process p;
   res
 
 let get_dlls binary =
