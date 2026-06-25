@@ -80,22 +80,28 @@ let _is_system32 =
       || String.lowercase_ascii directory = "syswow64"
     | _ -> false
 
-(* external report_dlls : string -> string list = "ml_report_dlls" *)
-
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
+  let dlls : (Dll.t, unit) Hashtbl.t = Hashtbl.create 17 in
   let p = Process.start binary in
-  let t = DebugEvent.wait p in
+  let wait_event = DebugEvent.wait p in
   let rec loop () : unit =
     let () =
-      match t () with
+      match wait_event () with
       | Unknown ->  Format.eprintf "Unknown@."
       | CreateProcess -> Format.eprintf "CreateProcess@."
       | ExitProcess -> Format.eprintf "ExitProcess@."
-      | LoadDll _ -> Format.eprintf "LoadDll@."
-      | UnloadDll _ -> Format.eprintf "UnloadDll@."
-      | Exception _  -> Format.eprintf "exception@."
+      | LoadDll dll ->  (
+          Format.eprintf "LoadDll@.";
+          Hashtbl.replace dlls dll ())
+      | UnloadDll dll -> (
+          Format.eprintf "UnloadDll@.";
+          Hashtbl.remove dlls dll)
+      | Exception _  -> (
+          Hashtbl.iter (fun dll () ->
+            Format.eprintf "Found %s@." (Dll.filename p dll)) dlls;
+          Format.eprintf "exception@.")
     in
     loop ()
   in
