@@ -110,8 +110,8 @@ let get_dlls binary =
         let path = OpamFilename.of_string @@ System.normalize_path path in
         Some path)
   in
-  Hashtbl.iter (fun dll () -> Dll.close dll) dlls;
-  Process.close p;
+  (* Hashtbl.iter (fun dll () -> Dll.close dll) dlls; *)
+  (* Process.close p; *)
   res
   (* match report_dlls binary with *)
   (* | exception Error msg -> *)
