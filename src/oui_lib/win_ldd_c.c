@@ -131,7 +131,7 @@ CAMLprim value ml_start_process(value mlPath) {
   CAMLreturn(Val_HANDLE(pi.hProcess));
 }
 
-CAMLprim value ml_stop_process(value mlProcess) {
+CAMLprim value ml_close_process(value mlProcess) {
   CAMLparam1(mlProcess);
   HANDLE process = HANDLE_Val(mlProcess);
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
