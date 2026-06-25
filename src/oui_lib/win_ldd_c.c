@@ -125,9 +125,7 @@ CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
   CAMLlocal1(res);
   HANDLE hProcess = HANDLE_Val(mlhProcess);
   DEBUG_EVENT ev;
-  TRACE("waiting event...");
   WaitForDebugEvent(&ev, INFINITE);
-  TRACE("got event!");
   DWORD debugEventCode = ev.dwDebugEventCode;
 
   switch(debugEventCode) {
@@ -152,6 +150,7 @@ CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
       res = Val_DebugEventCode(debugEventCode);
   }
 
+  ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
   CAMLreturn(res);
 }
 
