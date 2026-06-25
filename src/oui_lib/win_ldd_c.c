@@ -136,10 +136,10 @@ CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
       res = Val_DebugEventCode(debugEventCode);
       break;
     case LOAD_DLL_DEBUG_EVENT:
-      res = Val_DebugEventCode(debugEventCode), ev.u.LoadDll.lpBaseOfDll);
+      res = Val_DebugEventCode(debugEventCode, ev.u.LoadDll.lpBaseOfDll);
       break;
     case UNLOAD_DLL_DEBUG_EVENT:
-      res = Val_DebugEventCode(debugEventCode), ev.u.UnloadDll.lpBaseOfDll);
+      res = Val_DebugEventCode(debugEventCode, ev.u.UnloadDll.lpBaseOfDll);
       break;
     case EXCEPTION_DEBUG_EVENT:
       DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
@@ -198,8 +198,7 @@ value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 //
 // failure:
 //   free(buf);
-//   raise_error("cannot retrieve the filename of the module \
-//     with Last-Error code %ld", GetLastError());
+//   raise_error("cannot retrieve the filename of the module with Last-Error code %ld", GetLastError());
 // }
 //
 // static value ml_get_module_filenames(HANDLE hp, value mlList) {
