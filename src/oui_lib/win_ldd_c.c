@@ -121,7 +121,6 @@ static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
 static const unsigned char int3 = 0xcc;
 
 static HANDLE ml_start_process(value mlPath) {
-  raise_error("PLOP");
   CAMLparam1(mlPath);
   STARTUPINFOW si;
   PROCESS_INFORMATION pi;
