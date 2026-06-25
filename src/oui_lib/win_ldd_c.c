@@ -17,7 +17,7 @@
 
 #define TRACE(fmt, ...) \
   do { \
-    vfprintf(stderr, "Win ldd: " fmt "\n", ##__VA_ARGS__); \
+    fprintf(stderr, "Win ldd: " fmt "\n", ##__VA_ARGS__); \
     fflush(NULL); \
   } while(0)
 
