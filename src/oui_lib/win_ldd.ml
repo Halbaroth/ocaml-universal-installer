@@ -15,6 +15,7 @@ module DebugEvent : sig
     | Unknown
     | CreateProcess
     | ExitProcess
+    | EntryPoint
     | LoadDll of dll
     | UnloadDll of dll
     | Exception of int
@@ -80,6 +81,7 @@ let get_dlls binary =
       | Unknown ->  Format.eprintf "Unknown@."
       | CreateProcess -> Format.eprintf "CreateProcess@."
       | ExitProcess -> Format.eprintf "ExitProcess@."
+      | EntryPoint -> Format.eprintf "EntryPoint@."
       | LoadDll _ -> Format.eprintf "LoadDll@."
       | UnloadDll _ -> Format.eprintf "UnloadDll@."
       | Exception _  -> Format.eprintf "exception@."
