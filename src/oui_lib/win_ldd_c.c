@@ -92,6 +92,21 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
   CAMLreturnT(WCHAR *, result);
 }
 
+value ml_wchar_to_value(const WCHAR *string, UINT codepage)
+{
+  CAMLparam0();
+  CAMLlocal1(mlResult);
+  int w_len = wcslen(string);
+  int len = WideCharToMultiByte(CP_UTF8, 0, string, w_len, NULL, 0, NULL, NULL);
+  if (len == 0) {
+    mlResult = caml_copy_string("");
+  } else {
+    mlResult = caml_alloc_string(len);
+    WideCharToMultiByte(CP_UTF8, 0, string, w_len, (char *)Bytes_val(mlResult), len, NULL, NULL);
+  }
+  CAMLreturn(mlResult);
+}
+
 CAMLprim value ml_process_start(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
@@ -202,21 +217,6 @@ CAMLprim value ml_debugevent_wait(value mlhProcess, value mlUnit) {
 // DRAFT
 
 
-
-value ml_wchar_to_value(const WCHAR *string, UINT codepage)
-{
-  CAMLparam0();
-  CAMLlocal1(mlResult);
-  int w_len = wcslen(string);
-  int len = WideCharToMultiByte(CP_UTF8, 0, string, w_len, NULL, 0, NULL, NULL);
-  if (len == 0) {
-    mlResult = caml_copy_string("");
-  } else {
-    mlResult = caml_alloc_string(len);
-    WideCharToMultiByte(CP_UTF8, 0, string, w_len, (char *)Bytes_val(mlResult), len, NULL, NULL);
-  }
-  CAMLreturn(mlResult);
-}
 
 // #define Val_HMODULE(x) Val_long((HMODULE)x)
 // #define HMODULE_Val(x) (HMODULE)Long_val(x)
