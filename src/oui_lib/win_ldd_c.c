@@ -66,28 +66,6 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
 #define Val_HMODULE(x) Val_long((HMODULE)x)
 #define HMODULE_Val(x) (HMODULE)Long_val(x)
 
-static void foo(HANDLE hp, HMODULE hm) {
-  size_t len = 0;
-  DWORD res;
-  WCHAR* buf = NULL;
-
-  do {
-    len += 1024;
-    buf = realloc(buf, len * sizeof(*buf));
-    res = GetModuleFileNameExW(hp, hm, buf, len);
-    if (res == 0)
-      goto failure;
-  } while (res == len);
-
-  TRACE("found early %ls at %p", buf, hm);
-  free(buf);
-  return;
-
-failure:
-  TRACE("cannot found it yet!");
-  free(buf);
-}
-
 static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
   CAMLparam0();
   CAMLlocal1(mlResult);
@@ -170,8 +148,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
-      raise_error("Failed to wait for the next debug event with \
-        Last-Error code %ld", GetLastError());
+      raise_error("cannot wait debug event with Last-Error code %ld", GetLastError());
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
@@ -184,7 +161,6 @@ CAMLprim value ml_report_dlls(value mlPath) {
       case LOAD_DLL_DEBUG_EVENT:
         TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
-        foo(hProcess, hm);
         mlCell = caml_alloc(2, 0);
         Field(mlCell, 0) = Val_HMODULE(hm);
         Field(mlCell, 1) = mlCurr;
