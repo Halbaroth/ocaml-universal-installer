@@ -49,7 +49,7 @@ let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
 
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
-let is_system32 =
+let _is_system32 =
   (* Note: guaranteed to end with '\' *)
   let win_dir = get_windows_directory () in
   fun path ->
@@ -74,8 +74,8 @@ let is_system32 =
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
-  let t = trace binary in
-  let rec loop () =
+  let t = DebugEvent.trace binary in
+  let rec loop () : unit =
     let () =
       match t () with
       | Unknown ->  Format.eprintf "Unknown@."
