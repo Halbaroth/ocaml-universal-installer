@@ -39,7 +39,7 @@ end = struct
 
   let trace path =
     let p = start_process path in
-    next_debug_event process
+    next_debug_event p
 end
 
 exception Error of string
