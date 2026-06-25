@@ -60,7 +60,7 @@ end
 
 external get_windows_directory : unit -> string = "ml_get_windows_directory"
 
-let _is_system32 =
+let is_system32 =
   (* Note: guaranteed to end with '\' *)
   let win_dir = get_windows_directory () in
   fun path ->
@@ -91,22 +91,32 @@ let get_dlls binary =
       match wait_event () with
       | Unknown ->  Format.eprintf "Unknown@."
       | CreateProcess -> Format.eprintf "CreateProcess@."
-      | ExitProcess -> Format.eprintf "ExitProcess@."
+      | ExitProcess -> assert false
       | LoadDll dll ->  (
           Format.eprintf "LoadDll@.";
           Hashtbl.replace dlls dll ())
       | UnloadDll dll -> (
           Format.eprintf "UnloadDll@.";
           Hashtbl.remove dlls dll)
-      | Exception _  -> (
-          Hashtbl.iter (fun dll () ->
-            Format.eprintf "Found %s@." (Dll.filename p dll)) dlls;
-          Format.eprintf "exception@.")
+      | Exception _  ->
+          Format.eprintf "exception@."
     in
     loop ()
   in
   loop ();
-  []
+  let res =
+    Hashtbl.to_seq dlls
+    |> List.of_seq
+    |> List.filter_map (fun (dll, ()) ->
+      let path = Dll.filename p dll in
+      if is_system32 path then None
+      else
+        let path = OpamFilename.of_string @@ System.normalize_path path in
+        Some path)
+  in
+  Hashtbl.iter (fun dll () -> Dll.close dll) dlls;
+  Process.close p;
+  res
   (* match report_dlls binary with *)
   (* | exception Error msg -> *)
   (*     Format.eprintf "Failed with the following error: %s" msg; *)
