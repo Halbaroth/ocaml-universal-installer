@@ -140,7 +140,7 @@ CAMLprim value ml_dll_close(value mlDll) {
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value ml_get_module_filename(value mlProcess, value mlDll) {
+CAMLprim value ml_dll_filename(value mlProcess, value mlDll) {
   CAMLparam2(mlProcess, mlDll);
   CAMLlocal1(mlResult);
   HANDLE process = HANDLE_Val(mlProcess);
