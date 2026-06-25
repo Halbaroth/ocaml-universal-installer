@@ -66,7 +66,14 @@ static value Val_DebugEventCode(DWORD debugEventCode, ...) {
       break;
     case EXCEPTION_DEBUG_EVENT:
       res = caml_alloc(1, 2);
-      Field(res, 0) = Val_DWORD(va_arg(args, DWORD));
+      DWORD exceptionCode = va_arg(args, DWORD);
+      switch(exceptionCode) {
+        case EXCEPTION_BREAKPOINT:
+          Field(res, 0) = Val_int(1);
+          break;
+        default:
+          Field(res, 0) = Val_int(0);
+      }
       break;
     default:
       res = Val_int(0);

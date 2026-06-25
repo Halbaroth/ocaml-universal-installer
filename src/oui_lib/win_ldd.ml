@@ -37,23 +37,31 @@ end = struct
 end
 
 module DebugEvent : sig
+  type exn =
+    | Unknown
+    | Breakpoint
+
   type t =
     | Unknown
     | CreateProcess
     | ExitProcess
     | LoadDll of Dll.t
     | UnloadDll of Dll.t
-    | Exception of int
+    | Exception of exn
 
   val wait : Process.t -> unit -> t
 end = struct
+  type exn =
+    | Unknown
+    | Breakpoint
+
   type t =
     | Unknown
     | CreateProcess
     | ExitProcess
     | LoadDll of Dll.t
     | UnloadDll of Dll.t
-    | Exception of int
+    | Exception of exn
 
   external wait : Process.t -> unit -> t = "ml_debugevent_wait"
 end
@@ -88,7 +96,6 @@ let get_dlls binary =
   let wait_event = DebugEvent.wait p in
   let rec loop () : unit =
     match wait_event () with
-    | Unknown | CreateProcess -> loop ()
     | ExitProcess -> assert false
     | LoadDll dll ->  (
       Hashtbl.replace dlls dll ();
@@ -96,8 +103,9 @@ let get_dlls binary =
     | UnloadDll dll -> (
       Hashtbl.remove dlls dll;
       loop ())
-    | Exception _  ->
+    | Exception Breakpoint  ->
       Format.eprintf "exception@."
+    | Unknown | CreateProcess | Exception _ -> loop ()
   in
   loop ();
   let res =
