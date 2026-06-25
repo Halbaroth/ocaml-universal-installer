@@ -114,3 +114,8 @@ let get_dlls binary =
   (* Hashtbl.iter (fun dll () -> Dll.close dll) dlls; *)
   (* Process.close p; *)
   res
+
+let get_dlls binary =
+  try get_dlls binary
+  with exn ->
+    Format.eprintf "%s" (Printexc.to_string exn)
