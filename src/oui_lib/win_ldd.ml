@@ -8,6 +8,40 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module DebugEvent : sig
+  type dll
+
+  type event =
+    | Unknown
+    | CreateProcess
+    | ExitProcess
+    | LoadDll of dll
+    | UnloadDll of dll
+    | Exception of int
+
+  val trace : string -> unit -> t
+end = struct
+  type dll
+  type process
+
+  type event =
+    | Unknown
+    | CreateProcess
+    | ExitProcess
+    | EntryPoint
+    | LoadDll of dll
+    | UnloadDll of dll
+    | Exception of int
+
+  external start_process : string -> process = "ml_start_process"
+  (* external stop_process : process -> unit = "ml_stop_process" *)
+  external next_debug_event : process -> unit -> t = "ml_next_debug_event"
+
+  let trace path =
+    let p = start_process path in
+    next_debug_event process
+end
+
 exception Error of string
 
 let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
@@ -34,19 +68,34 @@ let is_system32 =
       || String.lowercase_ascii directory = "syswow64"
     | _ -> false
 
-external report_dlls : string -> string list = "ml_report_dlls"
+(* external report_dlls : string -> string list = "ml_report_dlls" *)
 
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   Format.eprintf "Searching dlls of %s...@." binary;
-  match report_dlls binary with
-  | exception Error msg ->
-      Format.eprintf "Failed with the following error: %s" msg;
-      []
-  | exception _ -> []
-  | dlls ->
-    List.filter_map (fun dll ->
-      if is_system32 dll then None
-      else
-        let path = OpamFilename.of_string @@ System.normalize_path dll in
-        Some path) dlls
+  let t = trace binary in
+  let rec loop () =
+    let () =
+      match t () with
+      | Unknown ->  Format.eprintf "Unknown@."
+      | CreateProcess -> Format.eprintf "CreateProcess@."
+      | ExitProcess -> Format.eprintf "ExitProcess@."
+      | LoadDll _ -> Format.eprintf "LoadDll@."
+      | UnloadDll _ -> Format.eprintf "UnloadDll@."
+      | Exception _  -> Format.eprintf "exception@."
+    in
+    loop ()
+  in
+  loop ();
+  []
+  (* match report_dlls binary with *)
+  (* | exception Error msg -> *)
+  (*     Format.eprintf "Failed with the following error: %s" msg; *)
+  (*     [] *)
+  (* | exception _ -> [] *)
+  (* | dlls -> *)
+  (*   List.filter_map (fun dll -> *)
+  (*     if is_system32 dll then None *)
+  (*     else *)
+  (*       let path = OpamFilename.of_string @@ System.normalize_path dll in *)
+  (*       Some path) dlls *)

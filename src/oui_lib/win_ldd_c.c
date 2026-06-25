@@ -29,8 +29,116 @@ static void raise_error(const char *restrict fmt, ...) {
   va_start(args, fmt);
   char buff[BUFFER_SIZE] = {};
   vsnprintf(buff, BUFFER_SIZE, fmt, args);
+  va_end(args);
   caml_raise_with_string(*caml_named_value("Win_ldd.Error"), buff);
 }
+
+#define Val_HANDLE(x) Val_long((HANDLE)x)
+#define HANDLE_Val(x) (HANDLE)Long_val(x)
+
+#define Val_HMODULE(x) Val_long((HMODULE)x)
+#define HMODULE_Val(x) (HMODULE)Long_val(x)
+
+#define Val_DWORD(x) Val_int((DWORD)x)
+#define DWORD_Val(x) (DWORD)Int_val(x)
+
+#define Val_LPVOID(x) Val_long((LPVOID)x)
+
+static value Val_DebugEventCode(DWORD debugEventCode, ...) {
+  va_list args;
+  va_start(args, debugEventCode);
+  value res;
+
+  switch (debugEventCode) {
+    case CREATE_PROCESS_DEBUG_EVENT:
+      res = Val_int(1);
+      break;
+    case EXIT_PROCESS_DEBUG_EVENT:
+      res = Val_int(2);
+    case LOAD_DLL_DEBUG_EVENT:
+      res = caml_alloc(1, 0);
+      Field(res, 0) = Val_HMODULE(va_arg(args, HMODULE));
+      break;
+    case UNLOAD_DLL_DEBUG_EVENT:
+      res = caml_alloc(1, 1);
+      Field(res, 0) = Val_LPVOID(va_arg(args, LPVOID));
+      break;
+    case EXCEPTION_DEBUG_EVENT:
+      res = caml_alloc(1, 2);
+      Field(res, 0) = Val_DWORD(va_arg(args, DWORD));
+      break;
+    default:
+      res = Val_int(0);
+  }
+
+  va_end(args);
+  CAMLreturn(res);
+}
+
+CAMLprim value ml_start_process(value mlPath) {
+  CAMLparam1(mlPath);
+  STARTUPINFOW si;
+  PROCESS_INFORMATION pi;
+
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
+  if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
+      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
+    raise_error("cannot start the process");
+
+  CAMLreturn(Val_HANDLE(pi.hProcess));
+}
+
+static const size_t DOS_HEADER_SIZE = 4096;
+
+static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
+  PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
+  ReadProcessMemory(hProcess, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
+  PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
+  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
+}
+
+static const unsigned char int3 = 0xcc;
+
+CAMLprim value ml_next_debug_event(value mlhProcess, value mlUnit) {
+  CAMLparam2(mlProcess, mlUnit);
+  CAMLlocal1(res);
+  HANDLE hProcess = HANDLE_Val(mlhProcess);
+  DEBUG_EVENT ev;
+  WaitForDebugEvent(&ev, INFINITE);
+  DWORD debugEventCode = ev.dwDebugEventCode;
+
+  switch(debugEventCode) {
+    case CREATE_PROCESS_DEBUG_EVENT:
+      PVOID entry_point =
+          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
+      WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+      res = Val_DebugEventCode(debugEventCode);
+      break;
+    case LOAD_DLL_DEBUG_EVENT:
+      res = Val_DebugEventCode(debugEventCode), ev.u.LoadDll.lpBaseOfDll);
+      break;
+    case UNLOAD_DLL_DEBUG_EVENT:
+      res = Val_DebugEventCode(debugEventCode), ev.u.UnloadDll.lpBaseOfDll);
+      break;
+    case EXCEPTION_DEBUG_EVENT:
+      DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
+      res = Val_DebugEventCode(debugEventCode, exceptionCode);
+      break;
+    case EXIT_PROCESS_DEBUG_EVENT:
+    default:
+      res = Val_DebugEventCode(debugEventCode);
+  }
+
+  CAMLreturn(res);
+}
+
+// DRAFT
+
+
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
 {
@@ -63,134 +171,123 @@ WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
   CAMLreturnT(WCHAR *, result);
 }
 
-#define Val_HMODULE(x) Val_long((HMODULE)x)
-#define HMODULE_Val(x) (HMODULE)Long_val(x)
-
-static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
-  CAMLparam0();
-  CAMLlocal1(mlResult);
-
-  size_t len = 0;
-  DWORD res;
-  WCHAR* buf = NULL;
-
-  do {
-    len += 1024;
-    buf = realloc(buf, len * sizeof(*buf));
-    res = GetModuleFileNameExW(hp, hm, buf, len);
-    if (res == 0)
-      goto failure;
-  } while (res == len);
-
-  TRACE("found %ls at %p", buf, hm);
-  mlResult = ml_wchar_to_value(buf, CP_UTF8);
-  free(buf);
-  CAMLreturn(mlResult);
-
-failure:
-  free(buf);
-  raise_error("cannot retrieve the filename of the module \
-    with Last-Error code %ld", GetLastError());
-}
-
-static value ml_get_module_filenames(HANDLE hp, value mlList) {
-  CAMLparam1(mlList);
-  CAMLlocal2(mlCurr, mlCell);
-  mlCurr = Val_emptylist;
-
-  while(!Is_long(mlList)) {
-    HMODULE hm = HMODULE_Val(Field(mlList, 0));
-    mlCell= caml_alloc(2, 0);
-    Field(mlCell, 0) = ml_get_module_filename(hp, hm);
-    Field(mlCell, 1) = mlCurr;
-    mlCurr = mlCell;
-    mlList = Field(mlList, 1);
-  }
-
-  CAMLreturn(mlCurr);
-}
-
-static const size_t DOS_HEADER_SIZE = 4096;
-
-static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
-  PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
-  ReadProcessMemory(hProcess, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
-  PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
-  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
-}
-
-static const unsigned char int3 = 0xcc;
-
-static HANDLE ml_start_process(value mlPath) {
-  CAMLparam1(mlPath);
-  STARTUPINFOW si;
-  PROCESS_INFORMATION pi;
-
-  ZeroMemory(&si, sizeof(si));
-  si.cb = sizeof(si);
-  ZeroMemory(&pi, sizeof(pi));
-
-  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
-  if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
-      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
-    raise_error("cannot start the process");
-
-  CAMLreturnT(HANDLE, pi.hProcess);
-}
-
-CAMLprim value ml_report_dlls(value mlPath) {
-  CAMLparam1(mlPath);
-  CAMLlocal3(mlCurr, mlCell, mlResult);
-  HANDLE hProcess = ml_start_process(mlPath);
-  DEBUG_EVENT ev;
-  mlCurr = Val_emptylist;
-  mlResult = Val_emptylist;
-
-  while (1) {
-    if (!WaitForDebugEvent(&ev, INFINITE))
-      raise_error("cannot wait debug event with Last-Error code %ld", GetLastError());
-
-    switch (ev.dwDebugEventCode) {
-      case CREATE_PROCESS_DEBUG_EVENT:
-        TRACE("process created");
-        PVOID entry_point =
-          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
-        break;
-
-      case LOAD_DLL_DEBUG_EVENT:
-        TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
-        HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
-        mlCell = caml_alloc(2, 0);
-        Field(mlCell, 0) = Val_HMODULE(hm);
-        Field(mlCell, 1) = mlCurr;
-        mlCurr = mlCell;
-        break;
-
-      case EXCEPTION_DEBUG_EVENT:
-        switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
-          case STATUS_BREAKPOINT:
-            TRACE("reached the entrypoint of the program");
-            mlResult = ml_get_module_filenames(hProcess, mlCurr);
-            TerminateProcess(hProcess, 0);
-            break;
-        }
-        break;
-
-      case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
-        break;
-
-      case EXIT_PROCESS_DEBUG_EVENT:
-        TRACE("exit process");
-        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-        WaitForSingleObject(hProcess, INFINITE);
-        CAMLreturn(mlResult);
-    }
-
-    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-  }
-}
+// #define Val_HMODULE(x) Val_long((HMODULE)x)
+// #define HMODULE_Val(x) (HMODULE)Long_val(x)
+//
+// static value ml_get_module_filename(HANDLE hp, HMODULE hm) {
+//   CAMLparam0();
+//   CAMLlocal1(mlResult);
+//
+//   size_t len = 0;
+//   DWORD res;
+//   WCHAR* buf = NULL;
+//
+//   do {
+//     len += 1024;
+//     buf = realloc(buf, len * sizeof(*buf));
+//     res = GetModuleFileNameExW(hp, hm, buf, len);
+//     if (res == 0)
+//       goto failure;
+//   } while (res == len);
+//
+//   TRACE("found %ls at %p", buf, hm);
+//   mlResult = ml_wchar_to_value(buf, CP_UTF8);
+//   free(buf);
+//   CAMLreturn(mlResult);
+//
+// failure:
+//   free(buf);
+//   raise_error("cannot retrieve the filename of the module \
+//     with Last-Error code %ld", GetLastError());
+// }
+//
+// static value ml_get_module_filenames(HANDLE hp, value mlList) {
+//   CAMLparam1(mlList);
+//   CAMLlocal2(mlCurr, mlCell);
+//   mlCurr = Val_emptylist;
+//
+//   while(!Is_long(mlList)) {
+//     HMODULE hm = HMODULE_Val(Field(mlList, 0));
+//     mlCell= caml_alloc(2, 0);
+//     Field(mlCell, 0) = ml_get_module_filename(hp, hm);
+//     Field(mlCell, 1) = mlCurr;
+//     mlCurr = mlCell;
+//     mlList = Field(mlList, 1);
+//   }
+//
+//   CAMLreturn(mlCurr);
+// }
+//
+// static HANDLE ml_start_process(value mlPath) {
+//   CAMLparam1(mlPath);
+//   STARTUPINFOW si;
+//   PROCESS_INFORMATION pi;
+//
+//   ZeroMemory(&si, sizeof(si));
+//   si.cb = sizeof(si);
+//   ZeroMemory(&pi, sizeof(pi));
+//
+//   WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
+//   if(!CreateProcessW(NULL, path, NULL, NULL, FALSE,
+//       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
+//     raise_error("cannot start the process");
+//
+//   CAMLreturnT(HANDLE, pi.hProcess);
+// }
+//
+// CAMLprim value ml_report_dlls(value mlPath) {
+//   CAMLparam1(mlPath);
+//   CAMLlocal3(mlCurr, mlCell, mlResult);
+//   HANDLE hProcess = ml_start_process(mlPath);
+//   DEBUG_EVENT ev;
+//   mlCurr = Val_emptylist;
+//   mlResult = Val_emptylist;
+//
+//   while (1) {
+//     if (!WaitForDebugEvent(&ev, INFINITE))
+//       raise_error("cannot wait debug event with Last-Error code %ld", GetLastError());
+//
+//     switch (ev.dwDebugEventCode) {
+//       case CREATE_PROCESS_DEBUG_EVENT:
+//         TRACE("process created");
+//         PVOID entry_point =
+//           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
+//         WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+//         break;
+//
+//       case LOAD_DLL_DEBUG_EVENT:
+//         TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
+//         HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
+//         mlCell = caml_alloc(2, 0);
+//         Field(mlCell, 0) = Val_HMODULE(hm);
+//         Field(mlCell, 1) = mlCurr;
+//         mlCurr = mlCell;
+//         break;
+//
+//       case EXCEPTION_DEBUG_EVENT:
+//         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
+//           case STATUS_BREAKPOINT:
+//             TRACE("reached the entrypoint of the program");
+//             mlResult = ml_get_module_filenames(hProcess, mlCurr);
+//             TerminateProcess(hProcess, 0);
+//             break;
+//         }
+//         break;
+//
+//       case UNLOAD_DLL_DEBUG_EVENT:
+//         TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+//         break;
+//
+//       case EXIT_PROCESS_DEBUG_EVENT:
+//         TRACE("exit process");
+//         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+//         WaitForSingleObject(hProcess, INFINITE);
+//         CAMLreturn(mlResult);
+//     }
+//
+//     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+//   }
+// }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
 {
@@ -211,11 +308,11 @@ CAMLprim value ml_get_windows_directory(value mlUnit)
 
 #else
 
-CAMLprim value ml_report_dlls(value mlPath)
-{
-  CAMLparam1(mlPath);
-  CAMLreturn(Val_emptylist);
-}
+// CAMLprim value ml_report_dlls(value mlPath)
+// {
+//   CAMLparam1(mlPath);
+//   CAMLreturn(Val_emptylist);
+// }
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
 {
