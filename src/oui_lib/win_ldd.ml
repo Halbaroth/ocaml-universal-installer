@@ -66,7 +66,6 @@ let get_dlls binary =
       Hashtbl.replace dlls dll ();
       loop acc)
     | UnloadDll dll -> (
-      Format.eprintf "unload!";
       Hashtbl.remove dlls dll;
       loop acc)
     | Exception Breakpoint ->

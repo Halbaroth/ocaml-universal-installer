@@ -204,16 +204,18 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
 
     case LOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.LoadDll.lpBaseOfDll);
-      // TRACE("load dll 0x%p", ev.u.LoadDll.lpBaseOfDll);
+      TRACE("load dll 0x%p", ev.u.LoadDll.lpBaseOfDll);
       break;
 
     case UNLOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.UnloadDll.lpBaseOfDll);
+      TRACE("unload dll 0x%p", ev.u.UnloadDll.lpBaseOfDll);
       break;
 
     case EXCEPTION_DEBUG_EVENT:
       DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
       res = Val_DebugEventCode(debugEventCode, exceptionCode);
+      TRACE("exception");
       switch (exceptionCode) {
         case STATUS_BREAKPOINT:
           TRACE("STOP IT");
