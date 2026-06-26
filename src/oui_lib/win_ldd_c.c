@@ -21,6 +21,79 @@
     fflush(NULL); \
   } while(0)
 
+static const size_t DOS_HEADER_SIZE = 4096;
+
+static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
+  PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
+  ReadProcessMemory(process, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
+  PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
+  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
+}
+
+static const unsigned char int3 = 0xcc;
+
+CAMLprim value ml_start_process1(value mlPath) {
+  CAMLparam1(mlPath);
+  STARTUPINFOW si;
+  PROCESS_INFORMATION pi;
+
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  WCHAR* path = ml_value_to_wchar(mlPath, CP_UTF8);
+  CreateProcessW(NULL, path, NULL, NULL, FALSE,
+      DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi);
+
+  CAMLreturn(Val_HANDLE(pi.hProcess));
+}
+
+CAMLprim value ml_report_dlls(value mlPath) {
+  CAMLparam1(mlPath);
+  HANDLE hProcess = ml_start_process1(mlPath);
+  DEBUG_EVENT ev;
+  DWORD continueStatus = DBG_CONTINUE;
+
+  while (1) {
+    WaitForDebugEvent(&ev, INFINITE);
+
+    switch (ev.dwDebugEventCode) {
+      case CREATE_PROCESS_DEBUG_EVENT:
+        TRACE("process created");
+        PVOID entry_point =
+          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
+        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+        break;
+
+      case LOAD_DLL_DEBUG_EVENT:
+        TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
+        break;
+
+      case EXCEPTION_DEBUG_EVENT:
+        switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
+          case STATUS_BREAKPOINT:
+            TRACE("reached the entrypoint of the program");
+            TerminateProcess(hProcess, 0);
+            continueStatus = DBG_EXCEPTION_NOT_HANDLED;
+            break;
+        }
+        break;
+
+      case UNLOAD_DLL_DEBUG_EVENT:
+        TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+        break;
+
+      case EXIT_PROCESS_DEBUG_EVENT:
+        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, continueStatus);
+        WaitForSingleObject(hProcess, INFINITE);
+        TRACE("exit process");
+        CAMLreturn(Val_unit);
+    }
+
+    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, continueStatus);
+  }
+}
+
 static const size_t BUFFER_SIZE = 1024;
 
 static void raise_error(const char *restrict fmt, ...) {
@@ -165,17 +238,6 @@ failure:
   raise_error("cannot retrieve the filename of the module with Last-Error code %ld", GetLastError());
 }
 
-
-static const size_t DOS_HEADER_SIZE = 4096;
-
-static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
-  PIMAGE_DOS_HEADER dos_header = alloca(DOS_HEADER_SIZE);
-  ReadProcessMemory(process, lpBaseOfImage, dos_header, DOS_HEADER_SIZE, NULL);
-  PIMAGE_NT_HEADERS nt_header = (PIMAGE_NT_HEADERS) ((PBYTE)dos_header + dos_header->e_lfanew);
-  return lpBaseOfImage + nt_header->OptionalHeader.AddressOfEntryPoint;
-}
-
-static const unsigned char int3 = 0xcc;
 
 static void close_process(HANDLE process, DEBUG_EVENT *ev) {
   do {

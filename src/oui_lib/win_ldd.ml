@@ -54,34 +54,41 @@ let is_system32 =
       || String.lowercase_ascii directory = "syswow64"
     | _ -> false
 
+external report_dlls : string -> unit = "ml_report_dlls"
+
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
-  Format.eprintf "Searching dlls of %s...@." binary;
-  let dlls : (dll, unit) Hashtbl.t = Hashtbl.create 17 in
-  let p = start_process binary in
-  let rec loop acc =
-    match wait_debug_event p () with
-    | ExitProcess -> acc
-    | LoadDll dll ->  (
-      Hashtbl.replace dlls dll ();
-      loop acc)
-    | UnloadDll dll -> (
-      Hashtbl.remove dlls dll;
-      loop acc)
-    | Exception Breakpoint ->
-      Format.eprintf "Breakpoint!@.";
-      let dlls = List.of_seq @@ Hashtbl.to_seq dlls in
-      List.filter_map (fun (dll, ()) ->
-        match filename_dll p dll with
-        | exception _ -> None
-        | path ->
-          if is_system32 path then None
-          else
-            let p = OpamFilename.of_string @@ System.normalize_path path in
-            Format.eprintf "Found %s@." path;
-            Some p) dlls
-    | Unknown | CreateProcess | Exception _ -> loop acc
-  in
-  let res = loop [] in
-  Hashtbl.iter (fun dll () -> close_dll dll) dlls;
-  res
+  report_dlls binary;
+  []
+
+(* let get_dlls binary = *)
+(*   let binary = OpamFilename.to_string binary in *)
+(*   Format.eprintf "Searching dlls of %s...@." binary; *)
+(*   let dlls : (dll, unit) Hashtbl.t = Hashtbl.create 17 in *)
+(*   let p = start_process binary in *)
+(*   let rec loop acc = *)
+(*     match wait_debug_event p () with *)
+(*     | ExitProcess -> acc *)
+(*     | LoadDll dll ->  ( *)
+(*       Hashtbl.replace dlls dll (); *)
+(*       loop acc) *)
+(*     | UnloadDll dll -> ( *)
+(*       Hashtbl.remove dlls dll; *)
+(*       loop acc) *)
+(*     | Exception Breakpoint -> *)
+(*       Format.eprintf "Breakpoint!@."; *)
+(*       let dlls = List.of_seq @@ Hashtbl.to_seq dlls in *)
+(*       List.filter_map (fun (dll, ()) -> *)
+(*         match filename_dll p dll with *)
+(*         | exception _ -> None *)
+(*         | path -> *)
+(*           if is_system32 path then None *)
+(*           else *)
+(*             let p = OpamFilename.of_string @@ System.normalize_path path in *)
+(*             Format.eprintf "Found %s@." path; *)
+(*             Some p) dlls *)
+(*     | Unknown | CreateProcess | Exception _ -> loop acc *)
+(*   in *)
+(*   let res = loop [] in *)
+(*   Hashtbl.iter (fun dll () -> close_dll dll) dlls; *)
+(*   res *)
