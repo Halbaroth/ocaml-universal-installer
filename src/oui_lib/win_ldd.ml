@@ -79,12 +79,14 @@ let get_dlls binary =
     Hashtbl.to_seq dlls
     |> List.of_seq
     |> List.filter_map (fun (dll, ()) ->
-      let path = filename_dll p dll in
-      if is_system32 path then None
-      else
-        let p = OpamFilename.of_string @@ System.normalize_path path in
-        Format.eprintf "Found %s@." path;
-        Some p)
+      match filename_dll p dll with
+      | exception _ -> None
+      | path ->
+        if is_system32 path then None
+        else
+          let p = OpamFilename.of_string @@ System.normalize_path path in
+          Format.eprintf "Found %s@." path;
+          Some p)
   in
   (* Hashtbl.iter (fun dll () -> close_dll dll) dlls; *)
   (* close_process p; *)
