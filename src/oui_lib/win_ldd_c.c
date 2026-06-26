@@ -220,7 +220,7 @@ CAMLprim value ml_get_dll_filename(value mlProcess, value mlAddr) {
       goto failure;
   } while (res == len);
 
-  TRACE("found %ls at %p", buf, hm);
+  TRACE("found %ls at %p", buf, addr);
   mlRes = ml_wchar_to_value(buf, CP_UTF8);
   free(buf);
   CAMLreturn(mlRes);
