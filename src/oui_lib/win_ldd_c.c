@@ -138,7 +138,7 @@ static value Val_debugger(HANDLE process, DWORD processId, DWORD threadId) {
 
 #define Process_Val(x) HANDLE_Val(Field(x, 0))
 #define ProcessId_Val(x) DWORD_Val(Field(x, 1))
-#define ThreadId_val(x) DWORD_Val(Field(x, 2))
+#define ThreadId_Val(x) DWORD_Val(Field(x, 2))
 
 CAMLprim value ml_start_debugger(value mlPath) {
   CAMLparam1(mlPath);
@@ -185,7 +185,7 @@ CAMLprim value ml_stop_debugger(value mlDebugger) {
     switch (ev.dwDebugEventCode) {
       case EXIT_PROCESS_DEBUG_EVENT:
         TRACE("exit process");
-        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+        continue_debugger(mlDebugger);
         WaitForSingleObject(process, INFINITE);
         CloseHandle(process);
         CAMLreturn(Val_unit);
@@ -232,6 +232,7 @@ CAMLprim value ml_wait_dll_event(value mlDebugger) {
           case STATUS_BREAKPOINT:
             TRACE("reached the entrypoint of the program");
             TerminateProcess(process, 0);
+            continue_debugger(mlDebugger);
             CAMLreturn(Val_none);
         }
         break;
