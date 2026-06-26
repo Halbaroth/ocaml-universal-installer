@@ -21,6 +21,9 @@
     fflush(NULL); \
   } while(0)
 
+#define Val_HANDLE(x) Val_long((HANDLE)x)
+#define HANDLE_Val(x) (HANDLE)Long_val(x)
+
 static const size_t DOS_HEADER_SIZE = 4096;
 
 static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
@@ -121,9 +124,6 @@ static void raise_error(const char *restrict fmt, ...) {
   va_end(args);
   caml_raise_with_string(*caml_named_value("Win_ldd.Error"), buff);
 }
-
-#define Val_HANDLE(x) Val_long((HANDLE)x)
-#define HANDLE_Val(x) (HANDLE)Long_val(x)
 
 #define Val_HMODULE(x) Val_long((HMODULE)x)
 #define HMODULE_Val(x) (HMODULE)Long_val(x)
