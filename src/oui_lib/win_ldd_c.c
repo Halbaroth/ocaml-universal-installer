@@ -93,7 +93,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
           case STATUS_BREAKPOINT:
             TRACE("reached the entrypoint of the program");
             TerminateProcess(hProcess, 0);
-            continueStatus = DBG_EXCEPTION_NOT_HANDLED;
+            // continueStatus = DBG_EXCEPTION_NOT_HANDLED;
             break;
         }
         break;
