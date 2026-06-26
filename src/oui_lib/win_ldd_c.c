@@ -134,6 +134,7 @@ CAMLprim value ml_start_process(value mlPath) {
 CAMLprim value ml_close_process(value mlProcess) {
   CAMLparam1(mlProcess);
   HANDLE process = HANDLE_Val(mlProcess);
+  TRACE("foo = %ld, bar = %ld", GetProcessId(process), GetThreadId(process));
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
   WaitForSingleObject(process, INFINITE);
