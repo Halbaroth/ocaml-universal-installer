@@ -69,7 +69,6 @@ let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   let d = start_debugger binary in
   let dlls : (addr, unit) Hashtbl.t = Hashtbl.create 17 in
-  let filenames : (addr, string) Hashtbl.t = Hashtbl.create 17 in
   let rec loop () =
     match wait_dll_event d with
     | Some (Load addr) -> (

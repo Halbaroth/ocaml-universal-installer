@@ -203,7 +203,7 @@ CAMLprim value ml_wait_dll_event(value mlProcess) {
 }
 
 CAMLprim value ml_get_dll_filename(value mlProcess, value mlAddr) {
-  CAMLparam1(mlProcess, mlAddr);
+  CAMLparam2(mlProcess, mlAddr);
   CAMLlocal1(mlRes);
   HANDLE process = HANDLE_Val(mlProcess);
   HMODULE addr = HMODULE_Val(mlAddr);
