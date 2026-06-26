@@ -121,7 +121,10 @@ static PVOID process_entry_point(HANDLE hProcess, LPVOID lpBaseOfImage) {
 
 static const unsigned char int3 = 0xcc;
 
-static HANDLE ml_start_process(value mlPath) {
+#define HANDLE_Val(x) (HANDLE)Long_val(x)
+#define Val_HANDLE(x) Val_long((HANDLE)x)
+
+CAMLprim value ml_start_debugger(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
   PROCESS_INFORMATION pi;
@@ -135,16 +138,28 @@ static HANDLE ml_start_process(value mlPath) {
       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
     raise_error("cannot start the process");
 
-  CAMLreturnT(HANDLE, pi.hProcess);
+  CAMLreturn(Val_HANDLE(pi.hProcess));
 }
 
-#define HANDLE_Val(x) (HANDLE)Long_val(x)
-#define Val_HANDLE(x) Val_long((HANDLE)x)
+CAMLprim value ml_stop_debugger(value mlProcess) {
+  CAMLparam1(mlProcess);
+  HANDLE process = HANDLE_Val(mlProcess);
+  DEBUG_EVENT ev;
 
-CAMLprim value ml_start_debugger(value mlPath) {
-  CAMLparam1(mlPath);
-  HANDLE hProcess = ml_start_process(mlPath);
-  CAMLreturn(Val_HANDLE(hProcess));
+  while (1) {
+    WaitForDebugEvent(&ev, INFINITE);
+
+    switch (ev.dwDebugEventCode) {
+      case EXIT_PROCESS_DEBUG_EVENT:
+        TRACE("exit process");
+        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+        WaitForSingleObject(process, INFINITE);
+        CloseHandle(process);
+        CAMLreturn(Val_unit);
+    }
+
+    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+  }
 }
 
 CAMLprim value ml_wait_dll_event(value mlProcess) {
@@ -184,16 +199,9 @@ CAMLprim value ml_wait_dll_event(value mlProcess) {
           case STATUS_BREAKPOINT:
             TRACE("reached the entrypoint of the program");
             TerminateProcess(process, 0);
-            break;
+            CAMLreturn(Val_none);
         }
         break;
-
-      case EXIT_PROCESS_DEBUG_EVENT:
-        TRACE("exit process");
-        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-        WaitForSingleObject(process, INFINITE);
-        CloseHandle(process);
-        CAMLreturn(Val_none);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
@@ -231,51 +239,6 @@ failure:
     with Last-Error code %ld", GetLastError());
 }
 
-CAMLprim value ml_report_dlls(value mlPath) {
-  CAMLparam1(mlPath);
-  HANDLE hProcess = ml_start_process(mlPath);
-  DEBUG_EVENT ev;
-
-  while (1) {
-    if (!WaitForDebugEvent(&ev, INFINITE))
-      raise_error("cannot wait debug event with Last-Error code %ld", GetLastError());
-
-    switch (ev.dwDebugEventCode) {
-      case CREATE_PROCESS_DEBUG_EVENT:
-        TRACE("process created");
-        PVOID entry_point =
-          process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
-        break;
-
-      case LOAD_DLL_DEBUG_EVENT:
-        TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
-        break;
-
-      case EXCEPTION_DEBUG_EVENT:
-        switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
-          case STATUS_BREAKPOINT:
-            TRACE("reached the entrypoint of the program");
-            TerminateProcess(hProcess, 0);
-            break;
-        }
-        break;
-
-      case UNLOAD_DLL_DEBUG_EVENT:
-        TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
-        break;
-
-      case EXIT_PROCESS_DEBUG_EVENT:
-        TRACE("exit process");
-        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-        WaitForSingleObject(hProcess, INFINITE);
-        CAMLreturn(Val_unit);
-    }
-
-    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-  }
-}
-
 CAMLprim value ml_get_windows_directory(value mlUnit)
 {
   CAMLparam1(mlUnit);
@@ -294,12 +257,6 @@ CAMLprim value ml_get_windows_directory(value mlUnit)
 }
 
 #else
-
-CAMLprim value ml_report_dlls(value mlPath)
-{
-  CAMLparam1(mlPath);
-  CAMLreturn(Val_emptylist);
-}
 
 CAMLprim value ml_get_windows_directory(value mlUnit)
 {
