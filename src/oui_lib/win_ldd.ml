@@ -17,6 +17,7 @@ type dll_event =
 
 external start_debugger : string -> debugger = "ml_start_debugger"
 external wait_dll_event : debugger -> dll_event option = "ml_wait_dll_event"
+external get_dll_filename : debugger -> addr -> string = "ml_get_dll_filename"
 
 exception Error of string
 
@@ -67,10 +68,25 @@ let get_dlls binary =
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in
   let d = start_debugger binary in
+  let dlls : (addr, unit) Hashtbl.t = Hashtbl.create 17 in
+  let filenames : (addr, string) Hashtbl.t = Hashtbl.create 17 in
   let rec loop () =
     match wait_dll_event d with
-    | Some _ -> (Format.eprintf "Got a dll@."; loop ())
-    | None -> Format.eprintf "End of event@."
+    | Some (Load addr) -> (
+        Format.eprintf "load dll";
+        Hashtbl.replace dlls addr ();
+        loop ())
+    | Some (Unload addr) -> (
+        Format.eprintf "unload dll";
+        Hashtbl.remove dlls addr;
+        loop ())
+    | None -> (
+        let dlls = List.of_seq @@ Seq.map fst @@ Hashtbl.to_seq dlls in
+        List.filter_map (fun addr ->
+          let path = get_dll_filename d addr in
+          if is_system32 path then None
+          else
+            let path = OpamFilename.of_string @@ System.normalize_path path in
+            Some path) dlls)
   in
-  loop ();
-  []
+  loop ()

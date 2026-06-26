@@ -202,6 +202,35 @@ CAMLprim value ml_wait_dll_event(value mlProcess) {
   CAMLreturn(caml_alloc_some(res));
 }
 
+CAMLprim value ml_get_dll_filename(value mlProcess, value mlAddr) {
+  CAMLparam1(mlProcess, mlAddr);
+  CAMLlocal1(mlRes);
+  HANDLE process = HANDLE_Val(mlProcess);
+  HMODULE addr = HMODULE_Val(mlAddr);
+
+  size_t len = 0;
+  DWORD res;
+  WCHAR* buf = NULL;
+
+  do {
+    len += 1024;
+    buf = realloc(buf, len * sizeof(*buf));
+    res = GetModuleFileNameExW(process, addr, buf, len);
+    if (res == 0)
+      goto failure;
+  } while (res == len);
+
+  TRACE("found %ls at %p", buf, hm);
+  mlRes = ml_wchar_to_value(buf, CP_UTF8);
+  free(buf);
+  CAMLreturn(mlRes);
+
+failure:
+  free(buf);
+  raise_error("cannot retrieve the filename of the module \
+    with Last-Error code %ld", GetLastError());
+}
+
 CAMLprim value ml_report_dlls(value mlPath) {
   CAMLparam1(mlPath);
   HANDLE hProcess = ml_start_process(mlPath);
