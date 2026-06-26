@@ -200,6 +200,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
           process_entry_point(process, ev.u.CreateProcessInfo.lpBaseOfImage);
       WriteProcessMemory(process, entry_point, &int3, sizeof(int3), NULL);
       res = Val_DebugEventCode(debugEventCode);
+      TRACE("insert breakpoint at the entrypoint");
       break;
 
     case LOAD_DLL_DEBUG_EVENT:
