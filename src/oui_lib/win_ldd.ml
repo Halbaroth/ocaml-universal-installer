@@ -61,39 +61,30 @@ let get_dlls binary =
   let dlls : (dll, unit) Hashtbl.t = Hashtbl.create 17 in
   let p = start_process binary in
   let wait_event = wait_debug_event p in
-  let rec loop () : unit =
+  let rec loop acc =
     match wait_event () with
-    | ExitProcess -> assert false
+    | ExitProcess -> acc
     | LoadDll dll ->  (
       Hashtbl.replace dlls dll ();
-      loop ())
+      loop acc)
     | UnloadDll dll -> (
+      Format.eprintf "unload!";
       Hashtbl.remove dlls dll;
-      loop ())
+      loop acc)
     | Exception Breakpoint ->
-      Format.eprintf "Breakpoint!@."
-    | Unknown | CreateProcess | Exception _ -> loop ()
+      Format.eprintf "Breakpoint!@.";
+      let dlls = List.of_seq @@ Hashtbl.to_seq dlls in
+      List.filter_map (fun (dll, ()) ->
+        match filename_dll p dll with
+        | exception _ -> None
+        | path ->
+          if is_system32 path then None
+          else
+            let p = OpamFilename.of_string @@ System.normalize_path path in
+            Format.eprintf "Found %s@." path;
+            Some p) dlls
+    | Unknown | CreateProcess | Exception _ -> loop acc
   in
-  loop ();
-  let res =
-    Hashtbl.to_seq dlls
-    |> List.of_seq
-    |> List.filter_map (fun (dll, ()) ->
-      match filename_dll p dll with
-      | exception _ -> None
-      | path ->
-        if is_system32 path then None
-        else
-          let p = OpamFilename.of_string @@ System.normalize_path path in
-          Format.eprintf "Found %s@." path;
-          Some p)
-  in
+  let res = loop [] in
   Hashtbl.iter (fun dll () -> close_dll dll) dlls;
-  let _ = wait_event () in
   res
-
-let get_dlls binary =
-  try get_dlls binary
-  with exn ->
-    Format.eprintf "%s" (Printexc.to_string exn);
-    []
