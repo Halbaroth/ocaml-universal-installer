@@ -59,9 +59,8 @@ let get_dlls binary =
   Format.eprintf "Searching dlls of %s...@." binary;
   let dlls : (dll, unit) Hashtbl.t = Hashtbl.create 17 in
   let p = start_process binary in
-  let wait_event = wait_debug_event p in
   let rec loop acc =
-    match wait_event () with
+    match wait_debug_event p () with
     | ExitProcess -> acc
     | LoadDll dll ->  (
       Hashtbl.replace dlls dll ();
