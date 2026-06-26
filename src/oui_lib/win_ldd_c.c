@@ -180,7 +180,7 @@ static const unsigned char int3 = 0xcc;
 static void close_process(HANDLE process, DEBUG_EVENT *ev) {
   do {
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-  } while (WaitForDebugEvent(&ev, 200));
+  } while (WaitForDebugEvent(ev, 200));
   WaitForSingleObject(process, INFINITE);
 }
 
