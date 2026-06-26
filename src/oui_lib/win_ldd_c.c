@@ -165,13 +165,13 @@ static void wait_for_debug_event(value mlDebugger, DEBUG_EVENT *ev) {
   WaitForDebugEvent(ev, INFINITE);
   Field(mlDebugger, 1) = Val_DWORD(ev->dwProcessId);
   Field(mlDebugger, 2) = Val_DWORD(ev->dwThreadId);
-  CAMLreturn0();
+  CAMLreturn0;
 }
 
 static void continue_debugger(value mlDebugger) {
   CAMLparam1(mlDebugger);
   ContinueDebugEvent(ProcessId_Val(mlDebugger), ThreadId_Val(mlDebugger), DBG_CONTINUE);
-  CAMLreturn0();
+  CAMLreturn0;
 }
 
 CAMLprim value ml_stop_debugger(value mlDebugger) {
