@@ -193,6 +193,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
 
   WaitForDebugEvent(&ev, INFINITE);
   DWORD debugEventCode = ev.dwDebugEventCode;
+  DWORD continueStatus = DBG_CONTINUE;
 
   switch(debugEventCode) {
     case CREATE_PROCESS_DEBUG_EVENT:
@@ -220,13 +221,15 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
         case STATUS_BREAKPOINT:
           TRACE("STOP IT");
           TerminateProcess(process, 0);
+          continueStatus = DBG_EXCEPTION_NOT_HANDLED;
           break;
       }
       break;
 
     case EXIT_PROCESS_DEBUG_EVENT:
+      TRACE("stopping process");
       DebugActiveProcessStop(GetProcessId(process));
-      ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+      ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, continueStatus);
       WaitForSingleObject(process, INFINITE);
       TRACE("process stopped");
       CAMLreturn(Val_DebugEventCode(debugEventCode));
@@ -235,7 +238,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
       res = Val_DebugEventCode(debugEventCode);
   }
 
-  ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+  ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, continueStatus);
   CAMLreturn(res);
 }
 
