@@ -144,7 +144,7 @@ static HANDLE ml_start_process(value mlPath) {
 CAMLprim value ml_start_debugger(value mlPath) {
   CAMLparam1(mlPath);
   HANDLE hProcess = ml_start_process(mlPath);
-  CAMLreturn1(Val_HANDLE(hProcess));
+  CAMLreturn(Val_HANDLE(hProcess));
 }
 
 CAMLprim value ml_wait_dll_event(value mlProcess) {
