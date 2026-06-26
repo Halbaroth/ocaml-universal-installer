@@ -222,7 +222,8 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
       break;
 
     case EXIT_PROCESS_DEBUG_EVENT:
-      close_process(process, &ev);
+      DebugActiveProcessStop(GetProcessId(process));
+      WaitForSingleObject(process, INFINITE);
       CAMLreturn(Val_DebugEventCode(debugEventCode));
 
     default:
