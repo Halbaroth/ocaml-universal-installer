@@ -216,7 +216,6 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
     case EXCEPTION_DEBUG_EVENT:
       DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
       res = Val_DebugEventCode(debugEventCode, exceptionCode);
-      TRACE("exception");
       switch (exceptionCode) {
         case STATUS_BREAKPOINT:
           TRACE("STOP IT");
@@ -228,6 +227,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
     case EXIT_PROCESS_DEBUG_EVENT:
       DebugActiveProcessStop(GetProcessId(process));
       WaitForSingleObject(process, INFINITE);
+      TRACE("process stopped");
       CAMLreturn(Val_DebugEventCode(debugEventCode));
 
     default:
