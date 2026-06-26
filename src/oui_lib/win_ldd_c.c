@@ -216,6 +216,7 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
       res = Val_DebugEventCode(debugEventCode, exceptionCode);
       switch (exceptionCode) {
         case STATUS_BREAKPOINT:
+          TRACE("STOP IT");
           TerminateProcess(process, 0);
           break;
       }
