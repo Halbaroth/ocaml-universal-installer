@@ -34,7 +34,10 @@ let is_system32 =
       || String.lowercase_ascii directory = "syswow64"
     | _ -> false
 
-external report_dlls : string -> string list = "ml_report_dlls"
+external report_dlls : string -> unit = "ml_report_dlls"
+
+let report_dlls s =
+  report_dlls s; []
 
 let get_dlls binary =
   let binary = OpamFilename.to_string binary in

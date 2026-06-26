@@ -140,11 +140,8 @@ static HANDLE ml_start_process(value mlPath) {
 
 CAMLprim value ml_report_dlls(value mlPath) {
   CAMLparam1(mlPath);
-  CAMLlocal3(mlCurr, mlCell, mlResult);
   HANDLE hProcess = ml_start_process(mlPath);
   DEBUG_EVENT ev;
-  mlCurr = Val_emptylist;
-  mlResult = Val_emptylist;
 
   while (1) {
     if (!WaitForDebugEvent(&ev, INFINITE))
@@ -160,18 +157,12 @@ CAMLprim value ml_report_dlls(value mlPath) {
 
       case LOAD_DLL_DEBUG_EVENT:
         TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
-        HMODULE hm = ev.u.LoadDll.lpBaseOfDll;
-        mlCell = caml_alloc(2, 0);
-        Field(mlCell, 0) = Val_HMODULE(hm);
-        Field(mlCell, 1) = mlCurr;
-        mlCurr = mlCell;
         break;
 
       case EXCEPTION_DEBUG_EVENT:
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
             TRACE("reached the entrypoint of the program");
-            mlResult = ml_get_module_filenames(hProcess, mlCurr);
             TerminateProcess(hProcess, 0);
             break;
         }
@@ -185,7 +176,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         TRACE("exit process");
         ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
         WaitForSingleObject(hProcess, INFINITE);
-        CAMLreturn(mlResult);
+        CAMLreturn(Val_unit);
     }
 
     ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
