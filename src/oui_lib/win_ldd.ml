@@ -89,7 +89,7 @@ let get_dlls binary =
           Some p)
   in
   Hashtbl.iter (fun dll () -> close_dll dll) dlls;
-  close_process p;
+  let _ = wait_event () in
   res
 
 let get_dlls binary =

@@ -136,7 +136,6 @@ CAMLprim value ml_close_process(value mlProcess) {
   HANDLE process = HANDLE_Val(mlProcess);
   TRACE("foo = %ld, bar = %ld", GetProcessId(process), GetThreadId(process));
   ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
-  ContinueDebugEvent(GetProcessId(process), GetThreadId(process), DBG_CONTINUE);
   WaitForSingleObject(process, INFINITE);
   CAMLreturn(Val_unit);
 }
@@ -215,6 +214,10 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
       TerminateProcess(process, 0);
       break;
     case EXIT_PROCESS_DEBUG_EVENT:
+      ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+      WaitForSingleObject(process, INFINITE);
+      res = Val_DebugEventCode(debugEventCode);
+      break;
     default:
       res = Val_DebugEventCode(debugEventCode);
   }
