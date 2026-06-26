@@ -32,6 +32,22 @@ static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
 
 static const unsigned char int3 = 0xcc;
 
+WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
+{
+  CAMLparam1(mlString);
+  WCHAR *result = NULL;
+  int w_len = MultiByteToWideChar(codepage, 0, String_val(mlString), -1, NULL, 0);
+  if (w_len == 0) {
+    result = NULL;
+  } else {
+    result = (WCHAR *)malloc(w_len * sizeof(WCHAR));
+    if (result != NULL) {
+      MultiByteToWideChar(codepage, 0, String_val(mlString), -1, result, w_len);
+    }
+  }
+  CAMLreturnT(WCHAR *, result);
+}
+
 CAMLprim value ml_start_process1(value mlPath) {
   CAMLparam1(mlPath);
   STARTUPINFOW si;
@@ -154,22 +170,6 @@ static value Val_DebugEventCode(DWORD debugEventCode, ...) {
 
   va_end(args);
   CAMLreturn(res);
-}
-
-WCHAR * ml_value_to_wchar(value mlString, UINT codepage)
-{
-  CAMLparam1(mlString);
-  WCHAR *result = NULL;
-  int w_len = MultiByteToWideChar(codepage, 0, String_val(mlString), -1, NULL, 0);
-  if (w_len == 0) {
-    result = NULL;
-  } else {
-    result = (WCHAR *)malloc(w_len * sizeof(WCHAR));
-    if (result != NULL) {
-      MultiByteToWideChar(codepage, 0, String_val(mlString), -1, result, w_len);
-    }
-  }
-  CAMLreturnT(WCHAR *, result);
 }
 
 value ml_wchar_to_value(const WCHAR *string, UINT codepage)
