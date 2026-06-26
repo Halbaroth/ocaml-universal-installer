@@ -183,7 +183,7 @@ CAMLprim value ml_wait_dll_event(value mlProcess) {
         switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
           case STATUS_BREAKPOINT:
             TRACE("reached the entrypoint of the program");
-            TerminateProcess(hProcess, 0);
+            TerminateProcess(process, 0);
             break;
         }
         break;
