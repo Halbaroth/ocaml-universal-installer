@@ -138,6 +138,70 @@ static HANDLE ml_start_process(value mlPath) {
   CAMLreturnT(HANDLE, pi.hProcess);
 }
 
+#define HANDLE_Val(x) (HANDLE)Long_val(x)
+#define Val_HANDLE(x) Val_long((HANDLE)x)
+
+CAMLprim value ml_start_debugger(value mlPath) {
+  CAMLparam1(mlPath);
+  HANDLE hProcess = ml_start_process(mlPath);
+  CAMLreturn1(Val_HANDLE(hProcess));
+}
+
+CAMLprim value ml_wait_dll_event(value mlProcess) {
+  CAMLparam1(mlProcess);
+  CAMLlocal1(res);
+  HANDLE process = HANDLE_Val(mlProcess);
+  DEBUG_EVENT ev;
+  BOOL cont = TRUE;
+
+  while (cont) {
+    WaitForDebugEvent(&ev, INFINITE);
+
+    switch (ev.dwDebugEventCode) {
+      case CREATE_PROCESS_DEBUG_EVENT:
+        TRACE("process created");
+        PVOID entry_point =
+          process_entry_point(process, ev.u.CreateProcessInfo.lpBaseOfImage);
+        WriteProcessMemory(process, entry_point, &int3, sizeof(int3), NULL);
+        break;
+
+      case LOAD_DLL_DEBUG_EVENT:
+        TRACE("load dll at 0x%p", ev.u.LoadDll.lpBaseOfDll);
+        res = caml_alloc(1, 0);
+        Field(res, 0) = Val_long(ev.u.LoadDll.lpBaseOfDll);
+        cont = FALSE;
+        break;
+
+      case UNLOAD_DLL_DEBUG_EVENT:
+        TRACE("unload dll at 0x%p", ev.u.UnloadDll.lpBaseOfDll);
+        res = caml_alloc(1, 1);
+        Field(res, 0) = Val_long(ev.u.UnloadDll.lpBaseOfDll);
+        cont = FALSE;
+        break;
+
+      case EXCEPTION_DEBUG_EVENT:
+        switch (ev.u.Exception.ExceptionRecord.ExceptionCode) {
+          case STATUS_BREAKPOINT:
+            TRACE("reached the entrypoint of the program");
+            TerminateProcess(hProcess, 0);
+            break;
+        }
+        break;
+
+      case EXIT_PROCESS_DEBUG_EVENT:
+        TRACE("exit process");
+        ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+        WaitForSingleObject(process, INFINITE);
+        CloseHandle(process);
+        CAMLreturn(Val_none);
+    }
+
+    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+  }
+
+  CAMLreturn(caml_alloc_some(res));
+}
+
 CAMLprim value ml_report_dlls(value mlPath) {
   CAMLparam1(mlPath);
   HANDLE hProcess = ml_start_process(mlPath);

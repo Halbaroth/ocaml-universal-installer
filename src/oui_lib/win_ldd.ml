@@ -8,6 +8,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type debugger
+type addr
+
+type dll_event =
+  | Load of addr
+  | Unload of addr
+
+external start_debugger : string -> debugger = "ml_start_debugger"
+external wait_dll_event : debugger -> dll_event option = "ml_wait_dll_event"
+
 exception Error of string
 
 let () = Callback.register_exception "Win_ldd.Error" (Error "dummy")
@@ -53,3 +63,14 @@ let get_dlls binary =
       else
         let path = OpamFilename.of_string @@ System.normalize_path dll in
         Some path) dlls
+
+let get_dlls binary =
+  let binary = OpamFilename.to_string binary in
+  let d = start_debugger binary in
+  let rec loop () =
+    match wait_dll_event d with
+    | Some _ -> (Format.eprintf "Got a dll@."; loop ())
+    | None -> Format.eprintf "End of event@."
+  in
+  loop ();
+  []
