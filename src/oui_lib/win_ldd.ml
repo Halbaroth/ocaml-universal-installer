@@ -53,11 +53,9 @@ let get_dlls binary =
   let rec loop () =
     match wait_dll_event d with
     | Some (Load addr) -> (
-        Format.eprintf "load dll@.";
         Hashtbl.replace dlls addr ();
         loop ())
     | Some (Unload addr) -> (
-        Format.eprintf "unload dll@.";
         Hashtbl.remove dlls addr;
         loop ())
     | None -> (

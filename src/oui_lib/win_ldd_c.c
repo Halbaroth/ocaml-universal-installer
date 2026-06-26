@@ -123,6 +123,22 @@ static const unsigned char int3 = 0xcc;
 
 #define HANDLE_Val(x) (HANDLE)Long_val(x)
 #define Val_HANDLE(x) Val_long((HANDLE)x)
+#define DWORD_Val(x) (DWORD)Int_val(x)
+#define Val_DWORD(x) Val_int((DWORD)x)
+
+static value Val_debugger(HANDLE process, DWORD processId, DWORD threadId) {
+  CAMLparam0();
+  CAMLlocal(mlRes);
+  mlRes = caml_alloc(3, 0);
+  Field(mlRes, 0) = Val_HANDLE(process);
+  Field(mlRes, 1) = Val_DWORD(processId);
+  Field(mlRes, 2) = Val_DWORD(threadId);
+  CAMLreturn(mlRes);
+}
+
+#define Process_Val(x) HANDLE_Val(Field(x, 0))
+#define ProcessId_Val(x) DWORD_Val(Field(x, 1))
+#define ThreadId_val(x) DWORD_Val(Field(x, 2))
 
 CAMLprim value ml_start_debugger(value mlPath) {
   CAMLparam1(mlPath);
@@ -138,16 +154,33 @@ CAMLprim value ml_start_debugger(value mlPath) {
       DEBUG_ONLY_THIS_PROCESS, NULL, NULL, &si, &pi))
     raise_error("cannot start the process");
 
-  CAMLreturn(Val_HANDLE(pi.hProcess));
+  HANDLE process = pi.hProcess;
+  DWORD processId = GetProcessId(process);
+  DWORD threadId = GetThreadId(process);
+  CAMLreturn(Val_debugger(process, processId, threadId));
 }
 
-CAMLprim value ml_stop_debugger(value mlProcess) {
-  CAMLparam1(mlProcess);
-  HANDLE process = HANDLE_Val(mlProcess);
+static void wait_for_debug_event(value mlDebugger, DEBUG_EVENT *ev) {
+  CAMLparam1(mlDebugger);
+  WaitForDebugEvent(ev, INFINITE);
+  Field(mlDebugger, 1) = Val_DWORD(ev->dwProcessId);
+  Field(mlDebugger, 2) = Val_DWORD(ev->dwThreadId);
+  CAMLreturn0();
+}
+
+static void continue_debugger(value mlDebugger) {
+  CAMLparam1(mlDebugger);
+  ContinueDebugEvent(ProcessId_Val(mlDebugger), ThreadId_Val(mlDebugger), DBG_CONTINUE);
+  CAMLreturn0();
+}
+
+CAMLprim value ml_stop_debugger(value mlDebugger) {
+  CAMLparam1(mlDebugger);
+  HANDLE process = Process_Val(mlDebugger);
   DEBUG_EVENT ev;
 
   while (1) {
-    WaitForDebugEvent(&ev, INFINITE);
+    wait_for_debug_event(mlDebugger, &ev);
 
     switch (ev.dwDebugEventCode) {
       case EXIT_PROCESS_DEBUG_EVENT:
@@ -158,19 +191,19 @@ CAMLprim value ml_stop_debugger(value mlProcess) {
         CAMLreturn(Val_unit);
     }
 
-    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+    continue_debugger(mlDebugger);
   }
 }
 
-CAMLprim value ml_wait_dll_event(value mlProcess) {
-  CAMLparam1(mlProcess);
+CAMLprim value ml_wait_dll_event(value mlDebugger) {
+  CAMLparam1(mlDebugger);
   CAMLlocal1(res);
   HANDLE process = HANDLE_Val(mlProcess);
   DEBUG_EVENT ev;
   BOOL cont = TRUE;
 
   while (cont) {
-    WaitForDebugEvent(&ev, INFINITE);
+    wait_for_debug_event(mlDebugger, &ev);
 
     switch (ev.dwDebugEventCode) {
       case CREATE_PROCESS_DEBUG_EVENT:
@@ -204,7 +237,7 @@ CAMLprim value ml_wait_dll_event(value mlProcess) {
         break;
     }
 
-    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+    continue_debugger(mlDebugger);
   }
 
   CAMLreturn(caml_alloc_some(res));
