@@ -81,7 +81,7 @@ CAMLprim value ml_report_dlls(value mlPath) {
         TRACE("process created");
         PVOID entry_point =
           process_entry_point(hProcess, ev.u.CreateProcessInfo.lpBaseOfImage);
-        WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
+        // WriteProcessMemory(hProcess, entry_point, &int3, sizeof(int3), NULL);
         break;
 
       case LOAD_DLL_DEBUG_EVENT:
