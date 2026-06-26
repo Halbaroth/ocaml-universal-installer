@@ -177,6 +177,13 @@ static PVOID process_entry_point(HANDLE process, LPVOID lpBaseOfImage) {
 
 static const unsigned char int3 = 0xcc;
 
+static void close_process(HANDLE process, DEBUG_EVENT *ev) {
+  do {
+    ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
+  } while (WaitForDebugEvent(&ev, 200));
+  WaitForSingleObject(process, INFINITE);
+}
+
 CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
   CAMLparam2(mlProcess, mlUnit);
   CAMLlocal1(res);
@@ -193,25 +200,30 @@ CAMLprim value ml_wait_debug_event(value mlProcess, value mlUnit) {
       WriteProcessMemory(process, entry_point, &int3, sizeof(int3), NULL);
       res = Val_DebugEventCode(debugEventCode);
       break;
+
     case LOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.LoadDll.lpBaseOfDll);
       // TRACE("load dll 0x%p", ev.u.LoadDll.lpBaseOfDll);
       break;
+
     case UNLOAD_DLL_DEBUG_EVENT:
       res = Val_DebugEventCode(debugEventCode, ev.u.UnloadDll.lpBaseOfDll);
       break;
+
     case EXCEPTION_DEBUG_EVENT:
       DWORD exceptionCode = ev.u.Exception.ExceptionRecord.ExceptionCode;
       res = Val_DebugEventCode(debugEventCode, exceptionCode);
-      TerminateProcess(process, 0);
+      switch (exceptionCode) {
+        case STATUS_BREAKPOINT:
+          TerminateProcess(process, 0);
+          break;
+      }
       break;
+
     case EXIT_PROCESS_DEBUG_EVENT:
-      TRACE("exiting...");
-      ContinueDebugEvent(ev.dwProcessId, ev.dwThreadId, DBG_CONTINUE);
-      TRACE("waiting...");
-      WaitForSingleObject(process, INFINITE);
-      TRACE("done");
+      close_process(process, &ev);
       CAMLreturn(Val_DebugEventCode(debugEventCode));
+
     default:
       res = Val_DebugEventCode(debugEventCode);
   }
