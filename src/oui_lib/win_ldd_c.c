@@ -128,7 +128,7 @@ static const unsigned char int3 = 0xcc;
 
 static value Val_debugger(HANDLE process, DWORD processId, DWORD threadId) {
   CAMLparam0();
-  CAMLlocal(mlRes);
+  CAMLlocal1(mlRes);
   mlRes = caml_alloc(3, 0);
   Field(mlRes, 0) = Val_HANDLE(process);
   Field(mlRes, 1) = Val_DWORD(processId);
@@ -198,7 +198,7 @@ CAMLprim value ml_stop_debugger(value mlDebugger) {
 CAMLprim value ml_wait_dll_event(value mlDebugger) {
   CAMLparam1(mlDebugger);
   CAMLlocal1(res);
-  HANDLE process = HANDLE_Val(mlProcess);
+  HANDLE process = Process_Val(mlDebugger);
   DEBUG_EVENT ev;
   BOOL cont = TRUE;
 
