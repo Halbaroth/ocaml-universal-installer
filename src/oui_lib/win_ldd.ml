@@ -70,7 +70,7 @@ let get_dlls binary =
     | UnloadDll dll -> (
       Hashtbl.remove dlls dll;
       loop ())
-    | Exception Breakpoint  ->
+    | Exception Breakpoint ->
       Format.eprintf "Breakpoint!@."
     | Unknown | CreateProcess | Exception _ -> loop ()
   in
@@ -88,8 +88,8 @@ let get_dlls binary =
           Format.eprintf "Found %s@." path;
           Some p)
   in
-  (* Hashtbl.iter (fun dll () -> close_dll dll) dlls; *)
-  (* close_process p; *)
+  Hashtbl.iter (fun dll () -> close_dll dll) dlls;
+  close_process p;
   res
 
 let get_dlls binary =
